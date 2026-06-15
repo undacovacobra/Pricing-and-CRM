@@ -5,8 +5,6 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  FileText,
-  DollarSign,
   Tag,
   Settings,
   LogOut,

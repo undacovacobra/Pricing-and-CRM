@@ -13,11 +13,10 @@ const nextStatus: Partial<Record<DocumentStatus, { status: DocumentStatus; label
 export function DocumentStatusActions({
   documentId,
   currentStatus,
-  jobId,
 }: {
   documentId: string;
   currentStatus: DocumentStatus;
-  jobId: string;
+  jobId?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();

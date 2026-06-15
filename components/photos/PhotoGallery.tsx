@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Camera } from "lucide-react";
+import { Camera } from "lucide-react";
 import type { JobPhoto } from "@/lib/types/database";
 
 export function PhotoGallery({ jobId, photos }: { jobId: string; photos: JobPhoto[] }) {

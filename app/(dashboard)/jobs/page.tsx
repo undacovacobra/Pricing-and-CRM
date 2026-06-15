@@ -41,7 +41,7 @@ export default async function JobsPage() {
       {/* Kanban-style columns (horizontal scroll on mobile, grid on desktop) */}
       <div className="overflow-x-auto pb-4">
         <div className="flex gap-4 min-w-max md:min-w-0 md:grid md:grid-cols-4">
-          {jobsByStage.map(({ value, label, jobs: stageJobs }) => (
+          {jobsByStage.map(({ value, jobs: stageJobs }) => (
             <div key={value} className="w-64 md:w-auto space-y-2">
               <div className="flex items-center justify-between">
                 <JobStageBadge stage={value as JobStage} />

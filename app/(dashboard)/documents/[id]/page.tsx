@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DocumentStatusActions } from "@/components/documents/DocumentStatusActions";
 import { AddPaymentForm } from "@/components/documents/AddPaymentForm";
 import { formatCurrency, formatDate } from "@/lib/utils";

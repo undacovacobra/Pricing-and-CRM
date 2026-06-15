@@ -3,7 +3,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { JobStageBadge } from "@/components/jobs/JobStageBadge";
 import { StageSelector } from "@/components/jobs/StageSelector";
 import { AddNoteForm } from "@/components/jobs/AddNoteForm";
 import { formatCurrency, formatDate } from "@/lib/utils";

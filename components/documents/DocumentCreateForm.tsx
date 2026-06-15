@@ -212,7 +212,7 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Prices for cabinet items will reflect this line's multiplier.
+                Prices for cabinet items will reflect this line&apos;s multiplier.
               </p>
             </div>
           </CardContent>
@@ -261,7 +261,7 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
         <CardContent className="space-y-3">
           {lineItems.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No items yet. Add from the catalog above or click "Add Item".
+              No items yet. Add from the catalog above or click &quot;Add Item&quot;.
             </p>
           )}
           {lineItems.map((li, index) => (

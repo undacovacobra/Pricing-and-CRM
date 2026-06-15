@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 import { CommissionList } from "@/components/commissions/CommissionList";
 
 export default async function CommissionsPage() {
