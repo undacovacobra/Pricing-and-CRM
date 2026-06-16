@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +30,7 @@ type FormValues = z.infer<typeof schema>;
 export function CustomerForm({ customer }: { customer?: Customer }) {
   const router = useRouter();
   const supabase = createClient();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -49,6 +51,7 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
   });
 
   async function onSubmit(values: FormValues) {
+    setSubmitError(null);
     const data = {
       ...values,
       email:         values.email || null,
@@ -62,11 +65,13 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
     };
 
     if (customer) {
-      await supabase.from("customers").update(data).eq("id", customer.id);
+      const { error } = await supabase.from("customers").update(data).eq("id", customer.id);
+      if (error) { setSubmitError(error.message); return; }
       router.push(`/customers/${customer.id}`);
     } else {
-      const { data: created } = await supabase.from("customers").insert(data).select().single();
-      router.push(`/customers/${created?.id}`);
+      const { data: created, error } = await supabase.from("customers").insert(data).select().single();
+      if (error || !created?.id) { setSubmitError(error?.message ?? "Failed to save customer. Please try again."); return; }
+      router.push(`/customers/${created.id}`);
     }
     router.refresh();
   }
@@ -132,6 +137,9 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
         </CardContent>
       </Card>
 
+      {submitError && (
+        <p className="text-sm text-destructive bg-red-50 border border-red-200 rounded-md px-3 py-2">{submitError}</p>
+      )}
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : customer ? "Save Changes" : "Create Customer"}

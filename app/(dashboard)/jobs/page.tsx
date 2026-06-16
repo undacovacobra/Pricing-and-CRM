@@ -16,7 +16,7 @@ export default async function JobsPage() {
     .order("updated_at", { ascending: false });
 
   const activeStages = JOB_STAGES.filter((s) =>
-    !["complete", "cancelled"].includes(s.value)
+    !["finished", "cancelled"].includes(s.value)
   );
 
   const jobsByStage = activeStages.map((stage) => ({
@@ -24,7 +24,7 @@ export default async function JobsPage() {
     jobs: jobs?.filter((j) => j.stage === stage.value) ?? [],
   }));
 
-  const completedJobs = jobs?.filter((j) => j.stage === "complete") ?? [];
+  const completedJobs = jobs?.filter((j) => j.stage === "finished") ?? [];
 
   return (
     <div className="space-y-6">
@@ -103,7 +103,7 @@ export default async function JobsPage() {
                         )}
                       </div>
                       <div className="text-right">
-                        <JobStageBadge stage="complete" />
+                        <JobStageBadge stage="finished" />
                         {job.actual_end_date && (
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatDate(job.actual_end_date)}

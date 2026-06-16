@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Receipt,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/",             label: "Dashboard",   icon: LayoutDashboard },
   { href: "/jobs",         label: "Jobs",        icon: Briefcase },
   { href: "/customers",    label: "Customers",   icon: Users },
+  { href: "/documents",    label: "Documents",   icon: FolderOpen },
   { href: "/pricing",      label: "Pricing",     icon: Tag },
   { href: "/commissions",  label: "Commissions", icon: Receipt },
   { href: "/settings",     label: "Settings",    icon: Settings },

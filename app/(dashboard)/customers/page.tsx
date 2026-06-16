@@ -39,7 +39,7 @@ export default async function CustomersPage() {
       <div className="grid gap-3">
         {customers?.map((customer) => {
           const jobs = customer.jobs as { id: string; stage: string }[] | null;
-          const activeJobs = jobs?.filter((j) => !["complete", "cancelled"].includes(j.stage)) ?? [];
+          const activeJobs = jobs?.filter((j) => !["finished", "cancelled"].includes(j.stage)) ?? [];
           return (
             <Link key={customer.id} href={`/customers/${customer.id}`}>
               <Card className="hover:shadow-md transition-shadow">

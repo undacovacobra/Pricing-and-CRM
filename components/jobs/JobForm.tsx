@@ -20,6 +20,7 @@ const schema = z.object({
   description:        z.string().optional(),
   stage:              z.string().min(1),
   job_address:        z.string().optional(),
+  contract_amount:    z.string().optional(),
   estimated_value:    z.string().optional(),
   start_date:         z.string().optional(),
   estimated_end_date: z.string().optional(),
@@ -45,6 +46,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
           description:        job.description ?? "",
           stage:              job.stage,
           job_address:        job.job_address ?? "",
+          contract_amount:    job.contract_amount?.toString() ?? "",
           estimated_value:    job.estimated_value?.toString() ?? "",
           start_date:         job.start_date ?? "",
           estimated_end_date: job.estimated_end_date ?? "",
@@ -80,6 +82,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
       description:        values.description || null,
       stage:              values.stage as JobStage,
       job_address:        values.job_address || null,
+      contract_amount:    values.contract_amount ? parseFloat(values.contract_amount) : null,
       estimated_value:    values.estimated_value ? parseFloat(values.estimated_value) : null,
       start_date:         values.start_date || null,
       estimated_end_date: values.estimated_end_date || null,
@@ -182,12 +185,20 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
             <Input id="job_address" {...register("job_address")} placeholder="Job site address (if different from customer)" />
           </div>
 
-          {/* Value + Dates */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Contract + Estimated Value */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="contract_amount">Contract Amount ($)</Label>
+              <Input id="contract_amount" type="number" step="0.01" {...register("contract_amount")} placeholder="0.00" />
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="estimated_value">Estimated Value ($)</Label>
               <Input id="estimated_value" type="number" step="0.01" {...register("estimated_value")} placeholder="0.00" />
             </div>
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="start_date">Start Date</Label>
               <Input id="start_date" type="date" {...register("start_date")} />
@@ -197,6 +208,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
               <Input id="estimated_end_date" type="date" {...register("estimated_end_date")} />
             </div>
           </div>
+
 
           {/* Notes */}
           <div className="space-y-1.5">

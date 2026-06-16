@@ -6,9 +6,8 @@ const stageConfig: Record<JobStage, { label: string; variant: "default" | "secon
   proposal_sent:    { label: "Proposal Sent",    variant: "info" },
   contract_signed:  { label: "Contract Signed",  variant: "purple" },
   in_progress:      { label: "In Progress",      variant: "warning" },
-  punch_list:       { label: "Punch List",       variant: "warning" },
-  complete:         { label: "Complete",         variant: "success" },
-  on_hold:          { label: "On Hold",          variant: "secondary" },
+  in_install:       { label: "In Install",       variant: "warning" },
+  finished:         { label: "Finished",         variant: "success" },
   cancelled:        { label: "Cancelled",        variant: "destructive" },
 };
 
@@ -19,11 +18,10 @@ export function JobStageBadge({ stage }: { stage: JobStage }) {
 
 export const JOB_STAGES: { value: JobStage; label: string }[] = [
   { value: "lead",            label: "Lead" },
-  { value: "proposal_sent",   label: "Proposal Sent" },
+  { value: "proposal_sent",  label: "Proposal Sent" },
   { value: "contract_signed", label: "Contract Signed" },
-  { value: "in_progress",     label: "In Progress" },
-  { value: "punch_list",      label: "Punch List" },
-  { value: "complete",        label: "Complete" },
-  { value: "on_hold",         label: "On Hold" },
-  { value: "cancelled",       label: "Cancelled" },
+  { value: "in_progress",    label: "In Progress" },
+  { value: "in_install",     label: "In Install" },
+  { value: "finished",       label: "Finished" },
+  { value: "cancelled",      label: "Cancelled" },
 ];

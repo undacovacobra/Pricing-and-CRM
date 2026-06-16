@@ -1,15 +1,15 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Briefcase, Tag, Receipt } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, FolderOpen, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileNavItems = [
-  { href: "/",            label: "Home",      icon: LayoutDashboard },
-  { href: "/jobs",        label: "Jobs",      icon: Briefcase },
-  { href: "/customers",   label: "Clients",   icon: Users },
-  { href: "/pricing",     label: "Pricing",   icon: Tag },
-  { href: "/commissions", label: "Commiss.",  icon: Receipt },
+  { href: "/",            label: "Home",    icon: LayoutDashboard },
+  { href: "/jobs",        label: "Jobs",    icon: Briefcase },
+  { href: "/customers",   label: "Clients", icon: Users },
+  { href: "/documents",   label: "Docs",    icon: FolderOpen },
+  { href: "/commissions", label: "Commiss", icon: Receipt },
 ];
 
 export function MobileNav() {

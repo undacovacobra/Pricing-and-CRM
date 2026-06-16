@@ -3,9 +3,8 @@ export type JobStage =
   | "proposal_sent"
   | "contract_signed"
   | "in_progress"
-  | "punch_list"
-  | "complete"
-  | "on_hold"
+  | "in_install"
+  | "finished"
   | "cancelled";
 
 export type DocumentType = "contract" | "invoice" | "change_order" | "quote";
@@ -64,10 +63,43 @@ export interface Job {
   estimated_end_date: string | null;
   actual_end_date: string | null;
   estimated_value: number | null;
+  contract_amount: number | null;
   notes: string | null;
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface MaterialOrder {
+  id: string;
+  job_id: string;
+  vendor: string;
+  description: string | null;
+  ordered_at: string | null;
+  estimated_arrival: string | null;
+  actual_arrival: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobAttachment {
+  id: string;
+  job_id: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number | null;
+  created_at: string;
+}
+
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  template_type: string;
+  storage_path: string;
+  file_name: string;
+  notes: string | null;
+  created_at: string;
 }
 
 export interface Document {
