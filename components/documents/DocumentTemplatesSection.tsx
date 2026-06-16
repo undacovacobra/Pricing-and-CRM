@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,7 +120,7 @@ export function DocumentTemplatesSection({ templates }: { templates: DocumentTem
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{TYPE_LABELS[sectionType]}</h3>
                 <div className="space-y-2">
                   {sectionTemplates.map((t) => {
-                    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/templates/${t.storage_path}`;
+                    const url = `${SUPABASE_URL}/storage/v1/object/public/templates/${t.storage_path}`;
                     return (
                       <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50">
                         <div className="flex items-center gap-3 min-w-0">

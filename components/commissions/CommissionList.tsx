@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,7 @@ function CommissionRow({ commission: c }: { commission: CommissionWithJob }) {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
+            href={`${SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:underline"

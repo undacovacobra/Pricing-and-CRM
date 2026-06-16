@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { Paperclip, Trash2, Download } from "lucide-react";
@@ -51,7 +52,7 @@ export function JobAttachmentsSection({ jobId, attachments }: { jobId: string; a
         <p className="text-sm text-muted-foreground text-center py-2">No attachments yet.</p>
       )}
       {attachments.map((att) => {
-        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/job-attachments/${att.storage_path}`;
+        const url = `${SUPABASE_URL}/storage/v1/object/public/job-attachments/${att.storage_path}`;
         return (
           <div key={att.id} className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50">
             <div className="flex items-center gap-2 min-w-0">

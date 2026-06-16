@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera } from "lucide-react";
@@ -40,7 +41,7 @@ export function PhotoGallery({ jobId, photos }: { jobId: string; photos: JobPhot
   }
 
   const filtered = filter === "all" ? photos : photos.filter((p) => p.phase === filter);
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = SUPABASE_URL;
 
   return (
     <div className="space-y-4">

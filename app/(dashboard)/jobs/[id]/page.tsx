@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StageSelector } from "@/components/jobs/StageSelector";
@@ -192,7 +193,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   {photos?.slice(0, 6).map((photo) => (
                     <div key={photo.id} className="aspect-square bg-slate-200 rounded overflow-hidden">
                       <img
-                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/job-photos/${photo.storage_path}`}
+                        src={`${SUPABASE_URL}/storage/v1/object/public/job-photos/${photo.storage_path}`}
                         alt={photo.caption ?? "Job photo"}
                         className="w-full h-full object-cover"
                       />

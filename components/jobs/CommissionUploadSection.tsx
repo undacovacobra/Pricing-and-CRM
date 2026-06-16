@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +64,7 @@ export function CommissionUploadSection({ jobId, commissions }: { jobId: string;
       )}
 
       {commissions.map((c) => {
-        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`;
+        const url = `${SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`;
         const isPaid = c.status === "paid";
         return (
           <div key={c.id} className={`border rounded-lg p-3 space-y-2 ${isPaid ? "opacity-60" : ""}`}>
