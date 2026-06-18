@@ -23,23 +23,43 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
   const [saving, setSaving] = useState(false);
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
+  const newReceiptRef = useRef<HTMLInputElement>(null);
+  const [newReceiptName, setNewReceiptName] = useState<string>("");
 
   async function handleAdd() {
     if (!vendor.trim()) return;
     setSaving(true);
+
+    // Optional receipt attached during creation
+    let receiptPath: string | null = null;
+    let receiptName: string | null = null;
+    const file = newReceiptRef.current?.files?.[0];
+    if (file) {
+      const path = `${jobId}/receipts/${Date.now()}-${file.name}`;
+      const { error: uploadErr } = await supabase.storage.from("job-attachments").upload(path, file);
+      if (!uploadErr) {
+        receiptPath = path;
+        receiptName = file.name;
+      }
+    }
+
     await supabase.from("material_orders").insert({
-      job_id:            jobId,
-      vendor:            vendor.trim(),
-      description:       description.trim() || null,
-      ordered_at:        orderedAt || null,
-      estimated_arrival: estimatedArrival || null,
-      actual_arrival:    actualArrival || null,
-      notes:             notes.trim() || null,
+      job_id:               jobId,
+      vendor:               vendor.trim(),
+      description:          description.trim() || null,
+      ordered_at:           orderedAt || null,
+      estimated_arrival:    estimatedArrival || null,
+      actual_arrival:       actualArrival || null,
+      notes:                notes.trim() || null,
+      receipt_storage_path: receiptPath,
+      receipt_file_name:    receiptName,
     });
     setSaving(false);
     setAdding(false);
     setVendor(""); setDescription(""); setOrderedAt("");
     setEstimatedArrival(""); setActualArrival(""); setNotes("");
+    setNewReceiptName("");
+    if (newReceiptRef.current) newReceiptRef.current.value = "";
     router.refresh();
   }
 
@@ -155,6 +175,17 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
             <div className="col-span-2 space-y-1">
               <Label className="text-xs">Notes</Label>
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Order number, tracking, etc." className="h-8 text-sm" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <Label className="text-xs">Receipt (optional)</Label>
+              <input
+                ref={newReceiptRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(e) => setNewReceiptName(e.target.files?.[0]?.name ?? "")}
+                className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200"
+              />
+              {newReceiptName && <p className="text-xs text-muted-foreground">{newReceiptName}</p>}
             </div>
           </div>
           <div className="flex gap-2">
