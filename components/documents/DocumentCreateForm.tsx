@@ -30,6 +30,7 @@ interface Props {
   cabinetLines:  CabinetLine[];
   settings:      AppSettings | null;
   templates:     DocumentTemplate[];
+  googleReady:   boolean;
 }
 
 const DOC_TYPES: { value: DocumentType; label: string }[] = [
@@ -39,7 +40,7 @@ const DOC_TYPES: { value: DocumentType; label: string }[] = [
   { value: "change_order", label: "Change Order" },
 ];
 
-export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, templates }: Props) {
+export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, templates, googleReady }: Props) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -242,7 +243,7 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, 
       </Card>
 
       {selectedTemplate ? (
-        <TemplateDocumentEditor jobId={job.id} title={title} template={selectedTemplate} />
+        <TemplateDocumentEditor jobId={job.id} title={title} template={selectedTemplate} googleReady={googleReady} />
       ) : (
       <>
       {/* Cabinet Line Selector */}

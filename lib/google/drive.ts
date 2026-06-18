@@ -107,3 +107,58 @@ export async function createDriveFolder(accessToken: string, name: string, paren
   if (!res.ok) throw new Error(`Drive folder creation failed: ${await res.text()}`);
   return res.json();
 }
+
+const DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+
+export interface DriveDoc {
+  id: string;
+  webViewLink: string;
+}
+
+// Uploads a source file (e.g. a .docx) and converts it to a native Google Doc,
+// placed inside parentId. Returns the editable Google Docs link.
+export async function uploadAsGoogleDoc(
+  accessToken: string,
+  name: string,
+  parentId: string | undefined,
+  data: ArrayBuffer,
+  sourceMime: string,
+): Promise<DriveDoc> {
+  const boundary = `crmboundary${Date.now()}`;
+  const metadata = {
+    name,
+    mimeType: "application/vnd.google-apps.document",
+    ...(parentId ? { parents: [parentId] } : {}),
+  };
+  const enc = new TextEncoder();
+  const pre = enc.encode(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: ${sourceMime}\r\n\r\n`,
+  );
+  const post = enc.encode(`\r\n--${boundary}--`);
+  const src = new Uint8Array(data);
+  const body = new Uint8Array(pre.length + src.length + post.length);
+  body.set(pre, 0);
+  body.set(src, pre.length);
+  body.set(post, pre.length + src.length);
+
+  const res = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink`, {
+    method:  "POST",
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+  if (!res.ok) throw new Error(`Google Doc creation failed: ${await res.text()}`);
+  return res.json();
+}
+
+export function sourceMimeForFile(fileName: string): string {
+  if (/\.docx$/i.test(fileName)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (/\.doc$/i.test(fileName)) return "application/msword";
+  if (/\.pdf$/i.test(fileName)) return "application/pdf";
+  if (/\.txt$/i.test(fileName)) return "text/plain";
+  if (/\.html?$/i.test(fileName)) return "text/html";
+  return "application/octet-stream";
+}

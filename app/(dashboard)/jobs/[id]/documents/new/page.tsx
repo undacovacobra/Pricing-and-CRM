@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DocumentCreateForm } from "@/components/documents/DocumentCreateForm";
+import { googleConfigured } from "@/lib/google/drive";
+import { getGoogleConnectionStatus } from "@/lib/google/connection";
 
 export default async function NewDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,6 +24,9 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
     supabase.from("document_templates").select("*").order("name"),
   ]);
 
+  const configured = googleConfigured();
+  const googleReady = configured && (await getGoogleConnectionStatus()).connected;
+
   return (
     <div className="max-w-4xl space-y-6">
       <div>
@@ -36,6 +41,7 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
         cabinetLines={cabinetLines ?? []}
         settings={settings}
         templates={templates ?? []}
+        googleReady={googleReady}
       />
     </div>
   );

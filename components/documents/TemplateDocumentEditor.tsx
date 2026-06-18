@@ -3,20 +3,23 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 import type { DocumentTemplate } from "@/lib/types/database";
 
 interface Props {
-  jobId:    string;
-  title:    string;
-  template: DocumentTemplate;
+  jobId:       string;
+  title:       string;
+  template:    DocumentTemplate;
+  googleReady: boolean;
 }
 
 function isWordDoc(fileName: string) {
   return /\.docx$/i.test(fileName);
 }
 
-export function TemplateDocumentEditor({ jobId, title, template }: Props) {
+export function TemplateDocumentEditor({ jobId, title, template, googleReady }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -24,16 +27,58 @@ export function TemplateDocumentEditor({ jobId, title, template }: Props) {
   const templateUrl = `${SUPABASE_URL}/storage/v1/object/public/templates/${template.storage_path}`;
   const editable = isWordDoc(template.file_name);
 
-  const [loading, setLoading] = useState(editable);
+  const [loading, setLoading] = useState(editable && !googleReady);
   const [html, setHtml] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  // Google Docs flow
+  const [showInline, setShowInline] = useState(false);
+  const [openingDoc, setOpeningDoc] = useState(false);
+  const [docUrl, setDocUrl] = useState<string | null>(null);
+
+  const inlineActive = !googleReady || showInline;
+
+  async function handleOpenInGoogleDocs() {
+    setError(null);
+    setOpeningDoc(true);
+    try {
+      const res = await fetch("/api/google/create-doc", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          templateStoragePath: template.storage_path,
+          templateFileName:    template.file_name,
+          templateName:        template.name,
+          title,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setError(data.error === "not_connected"
+          ? "Google Drive isn't connected. Connect it in Settings first."
+          : `Could not open in Google Docs: ${data.error ?? "unknown error"}`);
+        setOpeningDoc(false);
+        return;
+      }
+      setDocUrl(data.url);
+      setOpeningDoc(false);
+      // Open the editable Google Doc.
+      window.open(data.url, "_blank", "noopener,noreferrer");
+      router.refresh();
+    } catch (e) {
+      setError(`Could not open in Google Docs: ${String(e)}`);
+      setOpeningDoc(false);
+    }
+  }
+
   // Load + convert the Word document to editable HTML.
   useEffect(() => {
     let cancelled = false;
-    if (!editable) return;
+    if (!editable || !inlineActive) return;
+    setLoading(true);
     (async () => {
       try {
         const res = await fetch(templateUrl);
@@ -53,7 +98,7 @@ export function TemplateDocumentEditor({ jobId, title, template }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [templateUrl, editable]);
+  }, [templateUrl, editable, inlineActive]);
 
   // Populate the contentEditable once the HTML is ready.
   useEffect(() => {
@@ -148,11 +193,52 @@ export function TemplateDocumentEditor({ jobId, title, template }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Primary: real Google Docs editing */}
+      {googleReady && (
+        <div className="border rounded-lg p-4 bg-blue-50 border-blue-200 space-y-3">
+          <div className="flex items-start gap-3">
+            <FileText className="h-5 w-5 text-blue-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-blue-900">Edit in Google Docs (full design flexibility)</p>
+              <p className="text-xs text-blue-800">
+                Opens an editable copy of <span className="font-medium">{template.file_name}</span> as a Google Doc
+                in this job&apos;s Drive folder, with all of Google Docs&apos; design tools. A note is logged for tracking.
+              </p>
+            </div>
+          </div>
+          {docUrl ? (
+            <div className="flex gap-2">
+              <a href={docUrl} target="_blank" rel="noopener noreferrer"><Button size="sm">Reopen Google Doc</Button></a>
+              <Button size="sm" variant="outline" onClick={() => router.push(`/jobs/${jobId}`)}>Back to Job</Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={handleOpenInGoogleDocs} disabled={openingDoc}>
+              {openingDoc ? "Opening…" : "Open in Google Docs"}
+            </Button>
+          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          {!showInline && (
+            <button type="button" onClick={() => setShowInline(true)} className="text-xs text-blue-700 underline">
+              or edit a quick simplified copy here instead
+            </button>
+          )}
+        </div>
+      )}
+
+      {!googleReady && (
+        <div className="text-xs text-muted-foreground bg-slate-50 border rounded-md px-3 py-2">
+          Tip: <Link href="/settings" className="text-blue-600 underline">connect Google Drive in Settings</Link> to
+          edit templates with full Google Docs design flexibility. For now you can edit a simplified copy below.
+        </div>
+      )}
+
+      {inlineActive && (
+      <div className="space-y-3">
       {editable ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Editing a copy of <span className="font-medium">{template.file_name}</span>. Make your
+            Editing a simplified copy of <span className="font-medium">{template.file_name}</span>. Make your
             changes below, then save — it will be stored in this job&apos;s attachments and logged in notes.
           </p>
           {loading ? (
@@ -194,6 +280,8 @@ export function TemplateDocumentEditor({ jobId, title, template }: Props) {
             {saving ? "Saving…" : "Save Copy to Job"}
           </Button>
         </>
+      )}
+      </div>
       )}
     </div>
   );
