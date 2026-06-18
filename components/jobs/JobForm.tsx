@@ -95,6 +95,19 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
       router.push(`/jobs/${job.id}`);
     } else {
       const { data: created } = await supabase.from("jobs").insert(data).select().single();
+      // Best-effort: auto-create a matching Google Drive folder. No-ops if the
+      // user hasn't connected Google Drive or it isn't configured.
+      if (created?.id) {
+        try {
+          await fetch("/api/google/create-folder", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ jobId: created.id }),
+          });
+        } catch {
+          // ignore — folder creation is non-blocking
+        }
+      }
       router.push(`/jobs/${created?.id}`);
     }
     router.refresh();
