@@ -59,7 +59,7 @@ export function TemplateDocumentEditor({ jobId, title, template, googleReady }: 
       if (!res.ok || !data.url) {
         setError(data.error === "not_connected"
           ? "Google Drive isn't connected. Connect it in Settings first."
-          : `Could not open in Google Docs: ${data.error ?? "unknown error"}`);
+          : `Could not open in Google Docs: ${data.error ?? "unknown error"}${data.detail ? ` — ${data.detail}` : ""}`);
         setOpeningDoc(false);
         return;
       }
