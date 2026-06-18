@@ -9,9 +9,10 @@ import { AddNoteForm } from "@/components/jobs/AddNoteForm";
 import { MaterialOrdersSection } from "@/components/jobs/MaterialOrdersSection";
 import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
 import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
+import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip } from "lucide-react";
-import type { JobStage, DocumentType, MaterialOrder, JobAttachment } from "@/lib/types/database";
+import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2 } from "lucide-react";
+import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument } from "@/lib/types/database";
 
 const documentTypeLabels: Record<DocumentType, string> = {
   contract:     "Contract",
@@ -41,6 +42,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: payments },
     { data: materialOrders },
     { data: attachments },
+    { data: contractDocs },
   ] = await Promise.all([
     supabase.from("documents").select("*, document_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_notes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -48,15 +50,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("payments").select("*").eq("job_id", id).order("payment_date", { ascending: false }),
     supabase.from("material_orders").select("*").eq("job_id", id).order("ordered_at", { ascending: false }),
     supabase.from("job_attachments").select("*").eq("job_id", id).order("created_at", { ascending: false }),
+    supabase.from("contract_documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
   ]);
 
-  const changeOrderDocs = (documents ?? []).filter((d) => d.document_type === "change_order");
-  const changeOrderTotal = changeOrderDocs.reduce((sum, doc) => {
-    const lineTotal = (doc.document_line_items as { line_total: number }[])?.reduce((s, li) => s + (li.line_total ?? 0), 0) ?? 0;
-    return sum + lineTotal;
-  }, 0);
+  const contracts = (contractDocs ?? []).filter((d) => d.kind === "contract") as ContractDocument[];
+  const changeOrders = (contractDocs ?? []).filter((d) => d.kind === "change_order") as ContractDocument[];
 
-  const contractAmount = job.contract_amount ?? 0;
+  // Contract Amount and Change Orders stats are driven by the uploaded
+  // contract / change-order records and their manually-entered amounts.
+  const contractAmount = contracts.reduce((sum, c) => sum + (c.amount ?? 0), 0);
+  const changeOrderTotal = changeOrders.reduce((sum, c) => sum + (c.amount ?? 0), 0);
   const totalPaid = (payments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
   const balanceDue = contractAmount + changeOrderTotal - totalPaid;
 
@@ -241,6 +244,32 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   </Link>
                 );
               })}
+            </CardContent>
+          </Card>
+
+          {/* Contracts */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FileSignature className="h-4 w-4" /> Contracts
+              </CardTitle>
+              <span className="text-sm font-semibold">{contractAmount ? formatCurrency(contractAmount) : "—"}</span>
+            </CardHeader>
+            <CardContent>
+              <ContractDocsSection jobId={id} kind="contract" items={contracts} />
+            </CardContent>
+          </Card>
+
+          {/* Change Orders */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FilePlus2 className="h-4 w-4" /> Change Orders
+              </CardTitle>
+              <span className="text-sm font-semibold">{changeOrderTotal ? formatCurrency(changeOrderTotal) : "—"}</span>
+            </CardHeader>
+            <CardContent>
+              <ContractDocsSection jobId={id} kind="change_order" items={changeOrders} />
             </CardContent>
           </Card>
 

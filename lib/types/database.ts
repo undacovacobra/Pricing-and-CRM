@@ -105,6 +105,17 @@ export interface DocumentTemplate {
   created_at: string;
 }
 
+export interface ContractDocument {
+  id: string;
+  job_id: string;
+  kind: "contract" | "change_order";
+  storage_path: string | null;
+  file_name: string | null;
+  amount: number | null;
+  description: string | null;
+  created_at: string;
+}
+
 export interface Document {
   id: string;
   job_id: string;

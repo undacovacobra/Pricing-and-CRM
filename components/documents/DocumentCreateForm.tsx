@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Trash2, ExternalLink } from "lucide-react";
+import { TemplateDocumentEditor } from "@/components/documents/TemplateDocumentEditor";
 import type { Job, Customer, PricingItem, CabinetLine, AppSettings, DocumentType, DocumentTemplate } from "@/lib/types/database";
 
 interface LineItemDraft {
@@ -240,6 +241,10 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, 
         </CardContent>
       </Card>
 
+      {selectedTemplate ? (
+        <TemplateDocumentEditor jobId={job.id} title={title} template={selectedTemplate} />
+      ) : (
+      <>
       {/* Cabinet Line Selector */}
       {cabinetLines.length > 0 && (
         <Card>
@@ -442,6 +447,8 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, 
         </Button>
         <Button variant="outline" onClick={() => router.back()}>Cancel</Button>
       </div>
+      </>
+      )}
     </div>
   );
 }
