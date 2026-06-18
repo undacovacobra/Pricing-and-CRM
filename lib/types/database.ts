@@ -66,6 +66,7 @@ export interface Job {
   contract_amount: number | null;
   notes: string | null;
   assigned_to: string | null;
+  google_drive_folder_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +80,8 @@ export interface MaterialOrder {
   estimated_arrival: string | null;
   actual_arrival: string | null;
   notes: string | null;
+  receipt_storage_path: string | null;
+  receipt_file_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -142,6 +145,8 @@ export interface JobNote {
   job_id: string;
   author: string;
   content: string;
+  attachment_storage_path: string | null;
+  attachment_file_name: string | null;
   created_at: string;
 }
 
@@ -181,6 +186,7 @@ export interface Payment {
 export interface DesignerCommission {
   id: string;
   job_id: string | null;
+  job_name_freeform: string | null;
   invoice_storage_path: string;
   amount: number | null;
   status: CommissionStatus;
@@ -229,8 +235,8 @@ export type Database = {
       };
       jobs: {
         Row: Job;
-        Insert: { customer_id: string; title: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { customer_id?: string; title?: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; updated_at?: string };
+        Insert: { customer_id: string; title: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; google_drive_folder_url?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { customer_id?: string; title?: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; google_drive_folder_url?: string | null; updated_at?: string };
         Relationships: [];
       };
       documents: {
@@ -253,8 +259,8 @@ export type Database = {
       };
       job_notes: {
         Row: JobNote;
-        Insert: { job_id: string; content: string; author?: string; id?: string; created_at?: string };
-        Update: { content?: string; author?: string };
+        Insert: { job_id: string; content: string; author?: string; attachment_storage_path?: string | null; attachment_file_name?: string | null; id?: string; created_at?: string };
+        Update: { content?: string; author?: string; attachment_storage_path?: string | null; attachment_file_name?: string | null };
         Relationships: [];
       };
       job_photos: {
@@ -277,8 +283,8 @@ export type Database = {
       };
       designer_commissions: {
         Row: DesignerCommission;
-        Insert: { invoice_storage_path: string; job_id?: string | null; amount?: number | null; status?: CommissionStatus; submitted_at?: string; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { invoice_storage_path?: string; job_id?: string | null; amount?: number | null; status?: CommissionStatus; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; updated_at?: string };
+        Insert: { invoice_storage_path: string; job_id?: string | null; job_name_freeform?: string | null; amount?: number | null; status?: CommissionStatus; submitted_at?: string; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { invoice_storage_path?: string; job_id?: string | null; job_name_freeform?: string | null; amount?: number | null; status?: CommissionStatus; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; updated_at?: string };
         Relationships: [];
       };
       app_settings: {

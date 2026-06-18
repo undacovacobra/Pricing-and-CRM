@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +44,7 @@ export function CommissionList({ commissions }: { commissions: CommissionWithJob
             {paid.map((c) => (
               <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg opacity-70">
                 <div>
-                  <p className="text-sm font-medium">{c.job?.title ?? "No job linked"}</p>
+                  <p className="text-sm font-medium">{c.job?.title ?? c.job_name_freeform ?? "No job linked"}</p>
                   <p className="text-xs text-muted-foreground">
                     {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
                     Submitted {formatDate(c.submitted_at)}
@@ -92,7 +91,7 @@ function CommissionRow({ commission: c }: { commission: CommissionWithJob }) {
     <div className="border rounded-lg p-3 space-y-3">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium">{c.job?.title ?? "No job linked"}</p>
+          <p className="text-sm font-medium">{c.job?.title ?? c.job_name_freeform ?? "No job linked"}</p>
           <p className="text-xs text-muted-foreground">
             {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
             Submitted {formatDate(c.submitted_at)}
@@ -103,7 +102,7 @@ function CommissionRow({ commission: c }: { commission: CommissionWithJob }) {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={`${SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
+            href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:underline"

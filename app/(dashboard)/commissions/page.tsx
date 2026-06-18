@@ -2,14 +2,18 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { CommissionList } from "@/components/commissions/CommissionList";
+import { NewCommissionForm } from "@/components/commissions/NewCommissionForm";
 
 export default async function CommissionsPage() {
   const supabase = await createClient();
 
-  const { data: commissions } = await supabase
-    .from("designer_commissions")
-    .select("*, job:jobs(title, customer:customers(first_name, last_name))")
-    .order("submitted_at", { ascending: false });
+  const [{ data: commissions }, { data: jobs }] = await Promise.all([
+    supabase
+      .from("designer_commissions")
+      .select("*, job:jobs(title, customer:customers(first_name, last_name))")
+      .order("submitted_at", { ascending: false }),
+    supabase.from("jobs").select("*").order("title"),
+  ]);
 
   const pending = commissions?.filter((c) => c.status === "pending") ?? [];
   const paid = commissions?.filter((c) => c.status === "paid") ?? [];
@@ -41,6 +45,8 @@ export default async function CommissionsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <NewCommissionForm jobs={jobs ?? []} />
 
       <CommissionList commissions={commissions ?? []} />
     </div>

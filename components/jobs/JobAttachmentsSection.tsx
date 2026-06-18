@@ -8,6 +8,13 @@ import { formatDate } from "@/lib/utils";
 import { Paperclip, Trash2, Download } from "lucide-react";
 import type { JobAttachment } from "@/lib/types/database";
 
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+
+function isImageFile(fileName: string) {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
 export function JobAttachmentsSection({ jobId, attachments }: { jobId: string; attachments: JobAttachment[] }) {
   const router = useRouter();
   const supabase = createClient();
@@ -53,15 +60,22 @@ export function JobAttachmentsSection({ jobId, attachments }: { jobId: string; a
       )}
       {attachments.map((att) => {
         const url = `${SUPABASE_URL}/storage/v1/object/public/job-attachments/${att.storage_path}`;
+        const isImage = isImageFile(att.file_name);
         return (
           <div key={att.id} className="flex items-center justify-between p-2 border rounded-lg hover:bg-slate-50">
-            <div className="flex items-center gap-2 min-w-0">
-              <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+            <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 min-w-0">
+              {isImage ? (
+                <div className="h-9 w-9 rounded overflow-hidden bg-slate-200 shrink-0">
+                  <img src={url} alt={att.file_name} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
               <div className="min-w-0">
-                <p className="text-sm truncate">{att.file_name}</p>
+                <p className="text-sm truncate hover:underline">{att.file_name}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(att.created_at)}</p>
               </div>
-            </div>
+            </a>
             <div className="flex gap-1 shrink-0 ml-2">
               <a href={url} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="outline" className="h-7 px-2"><Download className="h-3 w-3" /></Button>

@@ -8,10 +8,10 @@ import { StageSelector } from "@/components/jobs/StageSelector";
 import { AddNoteForm } from "@/components/jobs/AddNoteForm";
 import { MaterialOrdersSection } from "@/components/jobs/MaterialOrdersSection";
 import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
-import { CommissionUploadSection } from "@/components/jobs/CommissionUploadSection";
+import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, Receipt } from "lucide-react";
-import type { JobStage, DocumentType, MaterialOrder, JobAttachment, DesignerCommission } from "@/lib/types/database";
+import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip } from "lucide-react";
+import type { JobStage, DocumentType, MaterialOrder, JobAttachment } from "@/lib/types/database";
 
 const documentTypeLabels: Record<DocumentType, string> = {
   contract:     "Contract",
@@ -39,7 +39,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: notes },
     { data: photos },
     { data: payments },
-    { data: commissions },
     { data: materialOrders },
     { data: attachments },
   ] = await Promise.all([
@@ -47,7 +46,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("job_notes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_photos").select("*").eq("job_id", id).order("created_at", { ascending: false }).limit(6),
     supabase.from("payments").select("*").eq("job_id", id).order("payment_date", { ascending: false }),
-    supabase.from("designer_commissions").select("*").eq("job_id", id).order("submitted_at", { ascending: false }),
     supabase.from("material_orders").select("*").eq("job_id", id).order("ordered_at", { ascending: false }),
     supabase.from("job_attachments").select("*").eq("job_id", id).order("created_at", { ascending: false }),
   ]);
@@ -127,6 +125,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <CardTitle className="text-sm">Job Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Google Drive Folder</p>
+                <GoogleDriveLink jobId={id} folderUrl={job.google_drive_folder_url} />
+              </div>
               {job.description && <p className="text-slate-700">{job.description}</p>}
               {job.job_address && (
                 <div>
@@ -274,18 +276,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </CardContent>
           </Card>
 
-          {/* Commission */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Receipt className="h-4 w-4" /> Commission Invoice
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CommissionUploadSection jobId={id} commissions={(commissions ?? []) as DesignerCommission[]} />
-            </CardContent>
-          </Card>
-
           {/* Notes */}
           <Card>
             <CardHeader className="pb-3">
@@ -302,6 +292,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                     <span className="text-xs text-muted-foreground">{formatDate(note.created_at)}</span>
                   </div>
                   <p className="text-slate-700">{note.content}</p>
+                  {note.attachment_storage_path && (
+                    <a
+                      href={`${SUPABASE_URL}/storage/v1/object/public/job-attachments/${note.attachment_storage_path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1"
+                    >
+                      <Paperclip className="h-3 w-3" /> {note.attachment_file_name ?? "Attachment"}
+                    </a>
+                  )}
                 </div>
               ))}
             </CardContent>

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
-import type { Job, Customer, PricingItem, CabinetLine, AppSettings, DocumentType } from "@/lib/types/database";
+import { Plus, Trash2, ExternalLink } from "lucide-react";
+import type { Job, Customer, PricingItem, CabinetLine, AppSettings, DocumentType, DocumentTemplate } from "@/lib/types/database";
 
 interface LineItemDraft {
   pricing_item_id: string | null;
@@ -27,6 +28,7 @@ interface Props {
   pricingItems:  PricingItem[];
   cabinetLines:  CabinetLine[];
   settings:      AppSettings | null;
+  templates:     DocumentTemplate[];
 }
 
 const DOC_TYPES: { value: DocumentType; label: string }[] = [
@@ -36,7 +38,7 @@ const DOC_TYPES: { value: DocumentType; label: string }[] = [
   { value: "change_order", label: "Change Order" },
 ];
 
-export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }: Props) {
+export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings, templates }: Props) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -44,6 +46,7 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
   const [docType, setDocType] = useState<DocumentType>("invoice");
   const [title, setTitle] = useState(job.title);
   const [clientNotes, setClientNotes] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [taxRate, setTaxRate] = useState(((settings?.default_tax_rate ?? 0) * 100).toString());
   const [depositAmount, setDepositAmount] = useState("0");
   const [discountAmount, setDiscountAmount] = useState("0");
@@ -55,6 +58,16 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
   const [saving, setSaving] = useState(false);
 
   const activeCabinetLine = cabinetLines.find((l) => l.id === selectedCabinetLine);
+  const matchingTemplates = templates.filter((t) => t.template_type === docType);
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
+
+  function applyTemplate(templateId: string) {
+    setSelectedTemplateId(templateId);
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+    setTitle(template.name);
+    if (template.notes) setClientNotes(template.notes);
+  }
 
   function addLineItem() {
     setLineItems((prev) => [
@@ -152,7 +165,7 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Document Type</Label>
-              <Select value={docType} onValueChange={(v) => setDocType(v as DocumentType)}>
+              <Select value={docType} onValueChange={(v) => { setDocType(v as DocumentType); setSelectedTemplateId(""); }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -168,6 +181,40 @@ export function DocumentCreateForm({ job, pricingItems, cabinetLines, settings }
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
           </div>
+
+          {matchingTemplates.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Start from Template (optional)</Label>
+              <div className="flex items-center gap-2">
+                <Select value={selectedTemplateId} onValueChange={applyTemplate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No template — start blank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {matchingTemplates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTemplate && (
+                  <a
+                    href={`${SUPABASE_URL}/storage/v1/object/public/templates/${selectedTemplate.storage_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button type="button" variant="outline" size="sm" className="gap-1 shrink-0">
+                      <ExternalLink className="h-3 w-3" /> View File
+                    </Button>
+                  </a>
+                )}
+              </div>
+              {selectedTemplate && (
+                <p className="text-xs text-muted-foreground">
+                  Title and client notes below have been pre-filled from this template — edit them as needed.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Title</Label>

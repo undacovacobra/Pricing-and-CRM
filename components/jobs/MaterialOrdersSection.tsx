@@ -1,12 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Receipt } from "lucide-react";
 import type { MaterialOrder } from "@/lib/types/database";
 
 export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders: MaterialOrder[] }) {
@@ -20,6 +21,8 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
   const [actualArrival, setActualArrival] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
 
   async function handleAdd() {
     if (!vendor.trim()) return;
@@ -51,8 +54,32 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
     router.refresh();
   }
 
+  function triggerReceiptUpload(orderId: string) {
+    setUploadingReceiptId(orderId);
+    receiptInputRef.current?.click();
+  }
+
+  async function handleReceiptSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const orderId = uploadingReceiptId;
+    if (!file || !orderId) return;
+
+    const path = `${jobId}/receipts/${orderId}-${Date.now()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("job-attachments").upload(path, file);
+    if (!uploadErr) {
+      await supabase.from("material_orders").update({
+        receipt_storage_path: path,
+        receipt_file_name:    file.name,
+      }).eq("id", orderId);
+    }
+    setUploadingReceiptId(null);
+    e.target.value = "";
+    router.refresh();
+  }
+
   return (
     <div className="space-y-3">
+      <input ref={receiptInputRef} type="file" className="hidden" onChange={handleReceiptSelected} />
       {orders.length === 0 && !adding && (
         <p className="text-sm text-muted-foreground text-center py-3">No material orders tracked yet.</p>
       )}
@@ -76,6 +103,16 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
                   {order.actual_arrival && <span className="text-green-700">Received: {formatDate(order.actual_arrival)}</span>}
                 </div>
                 {order.notes && <p className="text-xs text-muted-foreground italic mt-1">{order.notes}</p>}
+                {order.receipt_storage_path && (
+                  <a
+                    href={`${SUPABASE_URL}/storage/v1/object/public/job-attachments/${order.receipt_storage_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1"
+                  >
+                    <Receipt className="h-3 w-3" /> {order.receipt_file_name ?? "View Receipt"}
+                  </a>
+                )}
               </div>
               <div className="flex gap-1 shrink-0">
                 {!received && (
@@ -83,6 +120,9 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
                     Mark Received
                   </Button>
                 )}
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => triggerReceiptUpload(order.id)}>
+                  {order.receipt_storage_path ? "Replace Receipt" : "Upload Receipt"}
+                </Button>
                 <Button size="sm" variant="outline" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => handleDelete(order.id)}>
                   <Trash2 className="h-3 w-3" />
                 </Button>

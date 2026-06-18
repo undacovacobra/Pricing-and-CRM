@@ -15,10 +15,11 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
 
   if (!job) notFound();
 
-  const [{ data: pricingItems }, { data: cabinetLines }, { data: settings }] = await Promise.all([
+  const [{ data: pricingItems }, { data: cabinetLines }, { data: settings }, { data: templates }] = await Promise.all([
     supabase.from("pricing_items").select("*").eq("is_active", true).order("category").order("name"),
     supabase.from("cabinet_lines").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("app_settings").select("*").single(),
+    supabase.from("document_templates").select("*").order("name"),
   ]);
 
   return (
@@ -34,6 +35,7 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
         pricingItems={pricingItems ?? []}
         cabinetLines={cabinetLines ?? []}
         settings={settings}
+        templates={templates ?? []}
       />
     </div>
   );
