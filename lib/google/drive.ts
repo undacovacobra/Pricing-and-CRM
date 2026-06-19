@@ -152,6 +152,60 @@ export async function uploadFileToDrive(
   return res.json();
 }
 
+// Uploads a source file (e.g. a .docx) and converts it to a native Google Doc,
+// placed inside parentId. Returns the editable Google Docs link + file id.
+export async function uploadAsGoogleDoc(
+  accessToken: string,
+  name: string,
+  parentId: string | undefined,
+  data: ArrayBuffer,
+  sourceMime: string,
+): Promise<DriveDoc> {
+  const boundary = `crmboundary${Date.now()}`;
+  const metadata = {
+    name,
+    mimeType: "application/vnd.google-apps.document",
+    ...(parentId ? { parents: [parentId] } : {}),
+  };
+  const enc = new TextEncoder();
+  const pre = enc.encode(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: ${sourceMime}\r\n\r\n`,
+  );
+  const post = enc.encode(`\r\n--${boundary}--`);
+  const src = new Uint8Array(data);
+  const body = new Uint8Array(pre.length + src.length + post.length);
+  body.set(pre, 0);
+  body.set(src, pre.length);
+  body.set(post, pre.length + src.length);
+
+  const res = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink`, {
+    method:  "POST",
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+  if (!res.ok) throw new Error(`Google Doc creation failed: ${await res.text()}`);
+  return res.json();
+}
+
+// Exports a native Google Doc to a binary format (default .docx) so it can be
+// stored as a job attachment.
+export async function exportGoogleDoc(
+  accessToken: string,
+  fileId: string,
+  mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+): Promise<ArrayBuffer> {
+  const res = await fetch(
+    `${DRIVE_FILES_URL}/${fileId}/export?mimeType=${encodeURIComponent(mimeType)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) throw new Error(`Google Doc export failed: ${await res.text()}`);
+  return res.arrayBuffer();
+}
+
 export function sourceMimeForFile(fileName: string): string {
   if (/\.docx$/i.test(fileName)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   if (/\.doc$/i.test(fileName)) return "application/msword";
