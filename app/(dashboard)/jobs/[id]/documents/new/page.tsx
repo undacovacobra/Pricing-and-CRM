@@ -17,12 +17,7 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
 
   if (!job) notFound();
 
-  const [{ data: pricingItems }, { data: cabinetLines }, { data: settings }, { data: templates }] = await Promise.all([
-    supabase.from("pricing_items").select("*").eq("is_active", true).order("category").order("name"),
-    supabase.from("cabinet_lines").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("app_settings").select("*").single(),
-    supabase.from("document_templates").select("*").order("name"),
-  ]);
+  const { data: templates } = await supabase.from("document_templates").select("*").order("name");
 
   const configured = googleConfigured();
   const googleReady = configured && (await getGoogleConnectionStatus()).connected;
@@ -37,9 +32,6 @@ export default async function NewDocumentPage({ params }: { params: Promise<{ id
       </div>
       <DocumentCreateForm
         job={job as Parameters<typeof DocumentCreateForm>[0]["job"]}
-        pricingItems={pricingItems ?? []}
-        cabinetLines={cabinetLines ?? []}
-        settings={settings}
         templates={templates ?? []}
         googleReady={googleReady}
       />
