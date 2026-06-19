@@ -28,7 +28,6 @@ export function DocumentCreateForm({ job, templates, googleReady }: Props) {
   const [docType, setDocType] = useState<DocumentType>("invoice");
   const [title, setTitle] = useState(job.title);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  const [dueDate, setDueDate] = useState("");
 
   const matchingTemplates = templates.filter((t) => t.template_type === docType);
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
@@ -48,24 +47,18 @@ export function DocumentCreateForm({ job, templates, googleReady }: Props) {
           <CardTitle className="text-base">Document Info</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Document Type</Label>
-              <Select value={docType} onValueChange={(v) => { setDocType(v as DocumentType); setSelectedTemplateId(""); }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOC_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
+          <div className="space-y-1.5">
+            <Label>Document Type</Label>
+            <Select value={docType} onValueChange={(v) => { setDocType(v as DocumentType); setSelectedTemplateId(""); }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DOC_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {matchingTemplates.length > 0 && (
