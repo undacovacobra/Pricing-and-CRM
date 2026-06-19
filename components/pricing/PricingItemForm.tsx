@@ -29,8 +29,9 @@ const UNITS = ["each", "sq ft", "linear ft", "hour", "lot", "unit"];
 const schema = z.object({
   name:                       z.string().min(1, "Name required"),
   category:                   z.string().min(1, "Category required"),
+  subcategory:                z.string().optional(),
   unit:                       z.string().min(1, "Unit required"),
-  unit_price:                 z.string().min(1, "Price required"),
+  unit_price:                 z.string().optional(),
   description:                z.string().optional(),
   applies_to_cabinet_lines:   z.boolean(),
   is_active:                  z.boolean(),
@@ -48,8 +49,9 @@ export function PricingItemForm({ item }: { item?: PricingItem }) {
       ? {
           name:                     item.name,
           category:                 item.category,
+          subcategory:              item.subcategory ?? "",
           unit:                     item.unit,
-          unit_price:               item.unit_price.toString(),
+          unit_price:               item.unit_price?.toString() ?? "",
           description:              item.description ?? "",
           applies_to_cabinet_lines: item.applies_to_cabinet_lines,
           is_active:                item.is_active,
@@ -66,8 +68,9 @@ export function PricingItemForm({ item }: { item?: PricingItem }) {
     const data = {
       name:                     values.name,
       category:                 values.category,
+      subcategory:              values.subcategory || null,
       unit:                     values.unit,
-      unit_price:               parseFloat(values.unit_price),
+      unit_price:               values.unit_price ? parseFloat(values.unit_price) : null,
       description:              values.description || null,
       applies_to_cabinet_lines: values.applies_to_cabinet_lines,
       is_active:                values.is_active,
@@ -140,8 +143,13 @@ export function PricingItemForm({ item }: { item?: PricingItem }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="unit_price">Base Price ($) *</Label>
-            <Input id="unit_price" type="number" step="0.01" min="0" {...register("unit_price")} placeholder="0.00" />
+            <Label htmlFor="subcategory">Subcategory</Label>
+            <Input id="subcategory" {...register("subcategory")} placeholder="e.g. Drawer base" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="unit_price">Base Price ($)</Label>
+            <Input id="unit_price" type="number" step="0.01" min="0" {...register("unit_price")} placeholder="Leave blank for manual entry" />
             {errors.unit_price && <p className="text-xs text-destructive">{errors.unit_price.message}</p>}
           </div>
 

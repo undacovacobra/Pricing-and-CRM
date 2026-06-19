@@ -40,12 +40,38 @@ export interface PricingItem {
   name: string;
   description: string | null;
   category: string;
+  subcategory: string | null;
   unit: string;
-  unit_price: number;
+  unit_cost: number | null;
+  unit_price: number | null;
   applies_to_cabinet_lines: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface Estimate {
+  id: string;
+  job_id: string;
+  name: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EstimateLineItem {
+  id: string;
+  estimate_id: string;
+  pricing_item_id: string | null;
+  section: string;
+  subcategory: string | null;
+  code: string;
+  unit: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Customer {
@@ -260,8 +286,20 @@ export type Database = {
       };
       pricing_items: {
         Row: PricingItem;
-        Insert: { name: string; category: string; unit?: string; unit_price: number; description?: string | null; applies_to_cabinet_lines?: boolean; is_active?: boolean; id?: string; created_at?: string; updated_at?: string };
-        Update: { name?: string; category?: string; unit?: string; unit_price?: number; description?: string | null; applies_to_cabinet_lines?: boolean; is_active?: boolean; updated_at?: string };
+        Insert: { name: string; category: string; subcategory?: string | null; unit?: string; unit_cost?: number | null; unit_price?: number | null; description?: string | null; applies_to_cabinet_lines?: boolean; is_active?: boolean; id?: string; created_at?: string; updated_at?: string };
+        Update: { name?: string; category?: string; subcategory?: string | null; unit?: string; unit_cost?: number | null; unit_price?: number | null; description?: string | null; applies_to_cabinet_lines?: boolean; is_active?: boolean; updated_at?: string };
+        Relationships: [];
+      };
+      estimates: {
+        Row: Estimate;
+        Insert: { job_id: string; name?: string; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { job_id?: string; name?: string; notes?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      estimate_line_items: {
+        Row: EstimateLineItem;
+        Insert: { estimate_id: string; section: string; code: string; pricing_item_id?: string | null; subcategory?: string | null; unit?: string | null; quantity?: number; unit_price?: number; sort_order?: number; id?: string; created_at?: string };
+        Update: { section?: string; subcategory?: string | null; code?: string; unit?: string | null; quantity?: number; unit_price?: number; sort_order?: number };
         Relationships: [];
       };
       customers: {

@@ -22,12 +22,17 @@ export default async function PricingPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Pricing Catalog</h1>
-        <Button asChild size="sm">
-          <Link href="/pricing/new">
-            <Plus className="h-4 w-4" />
-            Add Item
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/estimates">Estimates</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/pricing/new">
+              <Plus className="h-4 w-4" />
+              Add Item
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Cabinet Lines / Multipliers */}
@@ -111,7 +116,7 @@ export default async function PricingPage() {
                         <td className="py-2 text-right font-mono">{formatCurrency(item.unit_price)}</td>
                         {cabinetLines?.filter((l) => !l.is_base).map((line) => (
                           <td key={line.id} className="py-2 text-right font-mono text-muted-foreground hidden md:table-cell">
-                            {item.applies_to_cabinet_lines
+                            {item.applies_to_cabinet_lines && item.unit_price != null
                               ? formatCurrency(item.unit_price * line.multiplier)
                               : "—"}
                           </td>
