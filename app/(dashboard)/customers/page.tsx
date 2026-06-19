@@ -9,7 +9,7 @@ export default async function CustomersPage() {
 
   const { data: customers } = await supabase
     .from("customers")
-    .select("*, jobs(id, stage)")
+    .select("*, jobs:jobs!jobs_customer_id_fkey(id, stage), parent_jobs:jobs!jobs_parent_customer_id_fkey(id, stage)")
     .order("last_name", { ascending: true });
 
   return (

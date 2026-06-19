@@ -11,7 +11,8 @@ export default async function DashboardPage() {
 
   const [
     { data: jobs },
-    { data: customers },
+    { count: activeJobCount },
+    { count: customerCount },
     { data: recentDocuments },
     { data: unpaidDocs },
     { data: recentPayments },
@@ -22,7 +23,8 @@ export default async function DashboardPage() {
       .not("stage", "in", '("finished","cancelled")')
       .order("updated_at", { ascending: false })
       .limit(5),
-    supabase.from("customers").select("id"),
+    supabase.from("jobs").select("id", { count: "exact", head: true }).not("stage", "in", '("finished","cancelled")'),
+    supabase.from("customers").select("id", { count: "exact", head: true }),
     supabase
       .from("documents")
       .select("*, job:jobs(title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
@@ -39,9 +41,6 @@ export default async function DashboardPage() {
       .order("payment_date", { ascending: false })
       .limit(5),
   ]);
-
-  const activeJobCount = jobs?.length ?? 0;
-  const customerCount = customers?.length ?? 0;
 
   const paymentsReceivedTotal = (recentPayments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
@@ -73,7 +72,7 @@ export default async function DashboardPage() {
                 <Briefcase className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{activeJobCount}</p>
+                <p className="text-2xl font-bold">{activeJobCount ?? 0}</p>
                 <p className="text-xs text-muted-foreground">Active Jobs</p>
               </div>
             </div>
@@ -87,7 +86,7 @@ export default async function DashboardPage() {
                 <Users className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{customerCount}</p>
+                <p className="text-2xl font-bold">{customerCount ?? 0}</p>
                 <p className="text-xs text-muted-foreground">Customers</p>
               </div>
             </div>

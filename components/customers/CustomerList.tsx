@@ -10,6 +10,7 @@ import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer } from "@/
 
 interface CustomerWithJobs extends Customer {
   jobs: { id: string; stage: string }[] | null;
+  parent_jobs: { id: string; stage: string }[] | null;
 }
 
 export function CustomerList({ customers }: { customers: CustomerWithJobs[] }) {
@@ -73,8 +74,8 @@ export function CustomerList({ customers }: { customers: CustomerWithJobs[] }) {
 
       <div className="grid gap-3">
         {filtered.map((customer) => {
-          const jobs = customer.jobs;
-          const activeJobs = jobs?.filter((j) => !["finished", "cancelled"].includes(j.stage)) ?? [];
+          const jobs = [...(customer.jobs ?? []), ...(customer.parent_jobs ?? [])];
+          const activeJobs = jobs.filter((j) => !["finished", "cancelled"].includes(j.stage));
           return (
             <Link key={customer.id} href={`/customers/${customer.id}`}>
               <Card className="hover:shadow-md transition-shadow">
