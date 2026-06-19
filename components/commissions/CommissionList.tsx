@@ -7,15 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
 import type { DesignerCommission } from "@/lib/types/database";
 
 interface CommissionWithJob extends DesignerCommission {
   job: { title: string; customer: { first_name: string; last_name: string } | null } | null;
 }
 
+function commissionTitle(c: CommissionWithJob) {
+  return c.notes || c.job?.title || c.job_name_freeform || "No description";
+}
+
 export function CommissionList({ commissions, isOwner }: { commissions: CommissionWithJob[]; isOwner: boolean }) {
+  const router = useRouter();
+  const supabase = createClient();
   const pending = commissions.filter((c) => c.status === "pending");
   const paid = commissions.filter((c) => c.status === "paid");
+
+  async function handleDelete(c: CommissionWithJob) {
+    if (!confirm(`Delete "${commissionTitle(c)}"? This can't be undone.`)) return;
+    await supabase.storage.from("commission-invoices").remove([c.invoice_storage_path]);
+    await supabase.from("designer_commissions").delete().eq("id", c.id);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-6">
@@ -29,7 +43,7 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
             <p className="text-sm text-muted-foreground text-center py-4">No pending commissions.</p>
           )}
           {pending.map((c) => (
-            <CommissionRow key={c.id} commission={c} isOwner={isOwner} />
+            <CommissionRow key={c.id} commission={c} isOwner={isOwner} onDelete={() => handleDelete(c)} />
           ))}
         </CardContent>
       </Card>
@@ -44,17 +58,22 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
             {paid.map((c) => (
               <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg opacity-70">
                 <div>
-                  <p className="text-sm font-medium">{c.job?.title ?? c.job_name_freeform ?? "No job linked"}</p>
+                  <p className="text-sm font-medium">{commissionTitle(c)}</p>
                   <p className="text-xs text-muted-foreground">
                     {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
                     Submitted {formatDate(c.submitted_at)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-green-700">
-                    {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Paid {c.paid_at ? formatDate(c.paid_at) : ""}</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-green-700">
+                      {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Paid {c.paid_at ? formatDate(c.paid_at) : ""}</p>
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDelete(c)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             ))}
@@ -65,7 +84,15 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
   );
 }
 
-function CommissionRow({ commission: c, isOwner }: { commission: CommissionWithJob; isOwner: boolean }) {
+function CommissionRow({
+  commission: c,
+  isOwner,
+  onDelete,
+}: {
+  commission: CommissionWithJob;
+  isOwner: boolean;
+  onDelete: () => void;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [paying, setPaying] = useState(false);
@@ -91,7 +118,7 @@ function CommissionRow({ commission: c, isOwner }: { commission: CommissionWithJ
     <div className="border rounded-lg p-3 space-y-3">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium">{c.job?.title ?? c.job_name_freeform ?? "No job linked"}</p>
+          <p className="text-sm font-medium">{commissionTitle(c)}</p>
           <p className="text-xs text-muted-foreground">
             {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
             Submitted {formatDate(c.submitted_at)}
@@ -114,6 +141,9 @@ function CommissionRow({ commission: c, isOwner }: { commission: CommissionWithJ
               Mark Paid
             </Button>
           )}
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

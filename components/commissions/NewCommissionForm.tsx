@@ -17,6 +17,7 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
   const [jobMode, setJobMode] = useState<"existing" | "freeform">("existing");
   const [jobId, setJobId] = useState("");
   const [jobName, setJobName] = useState("");
+  const [notes, setNotes] = useState("");
   const [amount, setAmount] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
     if (!file) { setError("Please attach a file."); return; }
     if (jobMode === "existing" && !jobId) { setError("Select a job or switch to typing a job name."); return; }
     if (jobMode === "freeform" && !jobName.trim()) { setError("Enter a job name."); return; }
+    if (!notes.trim()) { setError("Enter a note describing what this commission is for."); return; }
     setError(null);
     setUploading(true);
 
@@ -40,6 +42,7 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
       amount:                amount ? parseFloat(amount) : null,
       status:                "pending",
       submitted_at:          new Date().toISOString(),
+      notes:                 notes.trim(),
     });
 
     if (jobMode === "existing" && jobId) {
@@ -52,7 +55,7 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
 
     setUploading(false);
     setOpen(false);
-    setJobId(""); setJobName(""); setAmount("");
+    setJobId(""); setJobName(""); setAmount(""); setNotes("");
     if (fileRef.current) fileRef.current.value = "";
     router.refresh();
   }
@@ -68,6 +71,16 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
   return (
     <div className="border rounded-lg p-4 bg-slate-50 space-y-3">
       <p className="text-sm font-medium">New Commission Submission</p>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">What&apos;s this commission for? *</Label>
+        <Input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. Smith kitchen design fee"
+          className="h-8 text-sm"
+        />
+      </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs">Job</Label>
