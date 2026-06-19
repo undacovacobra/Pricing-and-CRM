@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStageBadge } from "@/components/jobs/JobStageBadge";
 import { formatCurrency, formatDate, formatPhoneNumber, customerName } from "@/lib/utils";
-import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen, Users, ChevronRight } from "lucide-react";
-import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer, type CustomerType, type JobStage } from "@/lib/types/database";
+import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen } from "lucide-react";
+import { CUSTOMER_TYPE_LABELS, type CustomerType, type JobStage } from "@/lib/types/database";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,8 +20,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   if (!customer) notFound();
 
-  const isUmbrella = UMBRELLA_CUSTOMER_TYPES.includes(customer.customer_type);
-
   // Jobs directly for this customer, plus (for umbrella customers) jobs grouped
   // under them via parent_customer_id.
   const { data: jobs } = await supabase
@@ -29,16 +27,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     .select("*")
     .or(`customer_id.eq.${id},parent_customer_id.eq.${id}`)
     .order("created_at", { ascending: false });
-
-  // The larger customer base this customer belongs to, and any sub-customers.
-  const [{ data: parent }, { data: subCustomers }] = await Promise.all([
-    customer.parent_customer_id
-      ? supabase.from("customers").select("*").eq("id", customer.parent_customer_id).single()
-      : Promise.resolve({ data: null as Customer | null }),
-    isUmbrella
-      ? supabase.from("customers").select("*").eq("parent_customer_id", id).order("first_name")
-      : Promise.resolve({ data: [] as Customer[] }),
-  ]);
 
   const { data: communications } = await supabase
     .from("communications")
@@ -61,14 +49,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
               {CUSTOMER_TYPE_LABELS[customer.customer_type as CustomerType]}
             </span>
-            {parent && (
-              <Link
-                href={`/customers/${parent.id}`}
-                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-              >
-                <Users className="h-3 w-3" /> Part of {customerName(parent)}
-              </Link>
-            )}
             {customer.google_drive_folder_url && (
               <a
                 href={customer.google_drive_folder_url}
@@ -88,32 +68,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </Link>
         </Button>
       </div>
-
-      {/* Sub-customers (for umbrella customers) */}
-      {isUmbrella && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" /> Customers under {customerName(customer)} ({subCustomers?.length ?? 0})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {!subCustomers?.length && (
-              <p className="text-sm text-muted-foreground">
-                No customers placed under this one yet. When adding a customer, set &ldquo;Belongs to&rdquo; to {customerName(customer)}.
-              </p>
-            )}
-            {subCustomers?.map((sub) => (
-              <Link key={sub.id} href={`/customers/${sub.id}`}>
-                <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 transition-colors">
-                  <span className="text-sm font-medium">{customerName(sub)}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid md:grid-cols-3 gap-6">
         {/* Contact Info */}

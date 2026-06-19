@@ -11,12 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { customerName } from "@/lib/utils";
 import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer, type CustomerType } from "@/lib/types/database";
 
 const schema = z.object({
-  customer_type:      z.enum(["individual", "builder", "contractor", "designer", "repeat"]),
-  parent_customer_id: z.string().optional(),
+  customer_type:      z.enum(["homeowner", "builder", "contractor", "designer"]),
   first_name:         z.string().min(1, "Name required"),
   last_name:          z.string().optional(),
   email:              z.string().email("Invalid email").optional().or(z.literal("")),
@@ -31,7 +29,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function CustomerForm({ customer, parents }: { customer?: Customer; parents: Customer[] }) {
+export function CustomerForm({ customer }: { customer?: Customer }) {
   const router = useRouter();
   const supabase = createClient();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -41,7 +39,6 @@ export function CustomerForm({ customer, parents }: { customer?: Customer; paren
     defaultValues: customer
       ? {
           customer_type:      customer.customer_type,
-          parent_customer_id: customer.parent_customer_id ?? "",
           first_name:         customer.first_name,
           last_name:          customer.last_name ?? "",
           email:              customer.email ?? "",
@@ -53,25 +50,22 @@ export function CustomerForm({ customer, parents }: { customer?: Customer; paren
           zip:                customer.zip ?? "",
           notes:              customer.notes ?? "",
         }
-      : { customer_type: "individual", parent_customer_id: "" },
+      : { customer_type: "homeowner" },
   });
 
   const customerType = watch("customer_type") as CustomerType;
   const isUmbrella = UMBRELLA_CUSTOMER_TYPES.includes(customerType);
-  // Don't allow nesting an umbrella under itself when editing.
-  const parentOptions = parents.filter((p) => p.id !== customer?.id);
 
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
 
     if (!isUmbrella && !values.last_name?.trim()) {
-      setSubmitError("Last name is required for an individual customer.");
+      setSubmitError("Last name is required for a homeowner.");
       return;
     }
 
     const data = {
       customer_type:      values.customer_type,
-      parent_customer_id: isUmbrella ? null : (values.parent_customer_id || null),
       first_name:         values.first_name.trim(),
       last_name:          isUmbrella ? "" : (values.last_name?.trim() ?? ""),
       email:              values.email || null,
@@ -131,8 +125,8 @@ export function CustomerForm({ customer, parents }: { customer?: Customer; paren
             </Select>
             <p className="text-xs text-muted-foreground">
               {isUmbrella
-                ? "This is a larger customer base (e.g. a builder). Individual customers and jobs can be placed under it, and it gets its own master Google Drive folder."
-                : "A regular customer. You can optionally place them under a larger customer base below."}
+                ? "This is a larger customer base (e.g. a builder). Jobs can be placed under it, and it gets its own master Google Drive folder."
+                : "A homeowner customer."}
             </p>
           </div>
 
@@ -155,32 +149,6 @@ export function CustomerForm({ customer, parents }: { customer?: Customer; paren
                   <Label htmlFor="last_name">Last Name *</Label>
                   <Input id="last_name" {...register("last_name")} />
                 </div>
-              </div>
-
-              {/* Belongs to (larger customer base) */}
-              <div className="space-y-1.5">
-                <Label>Belongs to (larger customer base)</Label>
-                <Select
-                  value={watch("parent_customer_id") || "none"}
-                  onValueChange={(v) => setValue("parent_customer_id", v === "none" ? "" : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="None — standalone customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None — standalone customer</SelectItem>
-                    {parentOptions.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {customerName(p)} ({CUSTOMER_TYPE_LABELS[p.customer_type]})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {parentOptions.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No larger customer bases yet. Create one by adding a customer of type Builder, Contractor, Designer, or Repeat customer.
-                  </p>
-                )}
               </div>
             </>
           )}

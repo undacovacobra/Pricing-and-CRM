@@ -156,16 +156,16 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
           {/* Larger customer base */}
           {umbrellaCustomers.length > 0 && (
             <div className="space-y-1.5">
-              <Label>Part of a larger customer base?</Label>
+              <Label>Contractor/Builder</Label>
               <Select
                 value={watch("parent_customer_id") || "none"}
                 onValueChange={(v) => setValue("parent_customer_id", v === "none" ? "" : v)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="No — standalone job" />
+                  <SelectValue placeholder="N/A" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No — standalone job</SelectItem>
+                  <SelectItem value="none">N/A</SelectItem>
                   {umbrellaCustomers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {customerName(c)} ({CUSTOMER_TYPE_LABELS[c.customer_type]})

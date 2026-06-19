@@ -10,18 +10,17 @@ export type JobStage =
 export type DocumentType = "contract" | "invoice" | "change_order" | "quote";
 export type DocumentStatus = "draft" | "sent" | "signed" | "paid" | "void";
 export type CommissionStatus = "pending" | "paid";
-export type CustomerType = "individual" | "builder" | "contractor" | "designer" | "repeat";
+export type CustomerType = "homeowner" | "builder" | "contractor" | "designer";
 
 // Umbrella customer types — these can have other customers and jobs nested
 // under them, and get an auto-created master Google Drive folder.
-export const UMBRELLA_CUSTOMER_TYPES: CustomerType[] = ["builder", "contractor", "designer", "repeat"];
+export const UMBRELLA_CUSTOMER_TYPES: CustomerType[] = ["builder", "contractor", "designer"];
 
 export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
-  individual: "Individual customer",
+  homeowner:  "Homeowner",
   builder:    "Builder",
   contractor: "Contractor",
   designer:   "Designer",
-  repeat:     "Repeat customer",
 };
 
 export interface CabinetLine {

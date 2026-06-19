@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     .eq("id", customerId)
     .single();
   if (!customer) return NextResponse.json({ error: "customer_not_found" }, { status: 404 });
-  if (customer.customer_type === "individual") {
+  if (customer.customer_type === "homeowner") {
     return NextResponse.json({ skipped: true, reason: "not_umbrella" });
   }
   if (customer.google_drive_folder_id) {

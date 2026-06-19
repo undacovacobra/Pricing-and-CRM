@@ -3,16 +3,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerForm } from "@/components/customers/CustomerForm";
 import { customerName } from "@/lib/utils";
-import { UMBRELLA_CUSTOMER_TYPES } from "@/lib/types/database";
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: customer }, { data: parents }] = await Promise.all([
-    supabase.from("customers").select("*").eq("id", id).single(),
-    supabase.from("customers").select("*").in("customer_type", UMBRELLA_CUSTOMER_TYPES).order("first_name"),
-  ]);
+  const { data: customer } = await supabase.from("customers").select("*").eq("id", id).single();
 
   if (!customer) notFound();
 
@@ -24,7 +20,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
         </Link>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Edit Customer</h1>
       </div>
-      <CustomerForm customer={customer} parents={parents ?? []} />
+      <CustomerForm customer={customer} />
     </div>
   );
 }
