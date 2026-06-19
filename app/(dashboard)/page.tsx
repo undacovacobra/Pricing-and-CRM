@@ -18,14 +18,14 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from("jobs")
-      .select("*, customer:customers(first_name, last_name)")
+      .select("*, customer:customers!jobs_customer_id_fkey(first_name, last_name)")
       .not("stage", "in", '("finished","cancelled")')
       .order("updated_at", { ascending: false })
       .limit(5),
     supabase.from("customers").select("id"),
     supabase
       .from("documents")
-      .select("*, job:jobs(title, customer:customers(first_name, last_name))")
+      .select("*, job:jobs(title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
       .in("status", ["sent", "signed"])
       .order("created_at", { ascending: false })
       .limit(5),
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
       .in("status", ["sent", "signed"]),
     supabase
       .from("payments")
-      .select("*, job:jobs(title, customer:customers(first_name, last_name))")
+      .select("*, job:jobs(title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
       .order("payment_date", { ascending: false })
       .limit(5),
   ]);

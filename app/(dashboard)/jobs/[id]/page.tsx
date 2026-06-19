@@ -31,7 +31,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("*, customer:customers(*)")
+    .select("*, customer:customers!jobs_customer_id_fkey(*)")
     .eq("id", id)
     .single();
 

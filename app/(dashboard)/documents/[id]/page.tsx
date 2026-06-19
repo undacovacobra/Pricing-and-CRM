@@ -28,7 +28,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("*, job:jobs(*, customer:customers(*)), document_line_items(*)")
+    .select("*, job:jobs(*, customer:customers!jobs_customer_id_fkey(*)), document_line_items(*)")
     .eq("id", id)
     .single();
 

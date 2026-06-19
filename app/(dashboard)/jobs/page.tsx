@@ -9,7 +9,7 @@ export default async function JobsPage() {
 
   const { data: jobs } = await supabase
     .from("jobs")
-    .select("*, customer:customers(first_name, last_name)")
+    .select("*, customer:customers!jobs_customer_id_fkey(first_name, last_name)")
     .order("updated_at", { ascending: false });
 
   return (

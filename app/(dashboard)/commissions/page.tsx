@@ -10,7 +10,7 @@ export default async function CommissionsPage() {
   const [{ data: commissions }, { data: jobs }, { data: userData }] = await Promise.all([
     supabase
       .from("designer_commissions")
-      .select("*, job:jobs(title, customer:customers(first_name, last_name))")
+      .select("*, job:jobs(title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
       .order("submitted_at", { ascending: false }),
     supabase.from("jobs").select("*").order("title"),
     supabase.auth.getUser(),
