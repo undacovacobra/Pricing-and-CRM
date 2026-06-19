@@ -11,6 +11,7 @@ import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
 import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
 import { PaymentTracker } from "@/components/jobs/PaymentTracker";
+import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -90,6 +91,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <span className="hidden sm:inline">Edit</span>
             </Link>
           </Button>
+          <DeleteJobButton jobId={id} jobTitle={job.title} />
         </div>
       </div>
 

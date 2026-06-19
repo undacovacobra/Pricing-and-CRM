@@ -198,36 +198,39 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
             <Input id="job_address" {...register("job_address")} placeholder="Job site address (if different from customer)" />
           </div>
 
-          {/* Contract + Estimated Value */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="contract_amount">Contract Amount ($)</Label>
-              <Input id="contract_amount" type="number" step="0.01" {...register("contract_amount")} placeholder="0.00" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="estimated_value">Estimated Value ($)</Label>
-              <Input id="estimated_value" type="number" step="0.01" {...register("estimated_value")} placeholder="0.00" />
-            </div>
-          </div>
-
-          {/* Dates */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="start_date">Start Date</Label>
-              <Input id="start_date" type="date" {...register("start_date")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="estimated_end_date">Est. End Date</Label>
-              <Input id="estimated_end_date" type="date" {...register("estimated_end_date")} />
-            </div>
-          </div>
-
-
-          {/* Notes */}
+          {/* Contract Amount */}
           <div className="space-y-1.5">
-            <Label htmlFor="notes">Internal Notes</Label>
-            <Textarea id="notes" {...register("notes")} placeholder="Private notes about this job..." rows={2} />
+            <Label htmlFor="contract_amount">Contract Amount ($)</Label>
+            <Input id="contract_amount" type="number" step="0.01" {...register("contract_amount")} placeholder="0.00" />
           </div>
+
+          {job && (
+            <>
+              {/* Estimated Value */}
+              <div className="space-y-1.5">
+                <Label htmlFor="estimated_value">Estimated Value ($)</Label>
+                <Input id="estimated_value" type="number" step="0.01" {...register("estimated_value")} placeholder="0.00" />
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start_date">Start Date</Label>
+                  <Input id="start_date" type="date" {...register("start_date")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="estimated_end_date">Est. End Date</Label>
+                  <Input id="estimated_end_date" type="date" {...register("estimated_end_date")} />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label htmlFor="notes">Internal Notes</Label>
+                <Textarea id="notes" {...register("notes")} placeholder="Private notes about this job..." rows={2} />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

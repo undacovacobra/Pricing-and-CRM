@@ -7,13 +7,24 @@ import { NewCommissionForm } from "@/components/commissions/NewCommissionForm";
 export default async function CommissionsPage() {
   const supabase = await createClient();
 
-  const [{ data: commissions }, { data: jobs }] = await Promise.all([
+  const [{ data: commissions }, { data: jobs }, { data: userData }] = await Promise.all([
     supabase
       .from("designer_commissions")
       .select("*, job:jobs(title, customer:customers(first_name, last_name))")
       .order("submitted_at", { ascending: false }),
     supabase.from("jobs").select("*").order("title"),
+    supabase.auth.getUser(),
   ]);
+
+  let isOwner = false;
+  if (userData?.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userData.user.id)
+      .single();
+    isOwner = profile?.role === "owner";
+  }
 
   const pending = commissions?.filter((c) => c.status === "pending") ?? [];
   const paid = commissions?.filter((c) => c.status === "paid") ?? [];
@@ -48,7 +59,7 @@ export default async function CommissionsPage() {
 
       <NewCommissionForm jobs={jobs ?? []} />
 
-      <CommissionList commissions={commissions ?? []} />
+      <CommissionList commissions={commissions ?? []} isOwner={isOwner} />
     </div>
   );
 }

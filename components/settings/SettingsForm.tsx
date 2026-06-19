@@ -1,95 +1,83 @@
 "use client";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Image as ImageIcon, Trash2 } from "lucide-react";
 import type { AppSettings } from "@/lib/types/database";
-import { useState } from "react";
-
-type FormValues = {
-  company_name:     string;
-  company_address:  string;
-  company_phone:    string;
-  company_email:    string;
-  payment_terms:    string;
-  default_tax_rate: string;
-};
 
 export function SettingsForm({ settings }: { settings: AppSettings | null }) {
   const router = useRouter();
   const supabase = createClient();
-  const [saved, setSaved] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<FormValues>({
-    defaultValues: {
-      company_name:     settings?.company_name ?? "",
-      company_address:  settings?.company_address ?? "",
-      company_phone:    settings?.company_phone ?? "",
-      company_email:    settings?.company_email ?? "",
-      payment_terms:    settings?.payment_terms ?? "Payment due within 30 days.",
-      default_tax_rate: settings?.default_tax_rate != null ? (settings.default_tax_rate * 100).toFixed(2) : "0",
-    },
-  });
+  async function handleUpload() {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    setError(null);
+    setUploading(true);
 
-  async function onSubmit(values: FormValues) {
-    const data = {
-      company_name:     values.company_name,
-      company_address:  values.company_address || null,
-      company_phone:    values.company_phone || null,
-      company_email:    values.company_email || null,
-      payment_terms:    values.payment_terms || null,
-      default_tax_rate: parseFloat(values.default_tax_rate) / 100 || 0,
-    };
+    const path = `background-${Date.now()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("branding").upload(path, file);
+    if (uploadErr) { setError(uploadErr.message); setUploading(false); return; }
 
     if (settings) {
-      await supabase.from("app_settings").update(data).eq("id", settings.id);
+      await supabase.from("app_settings").update({ background_photo_path: path }).eq("id", settings.id);
     } else {
-      await supabase.from("app_settings").insert(data);
+      await supabase.from("app_settings").insert({ company_name: "", background_photo_path: path });
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+    router.refresh();
+  }
+
+  async function handleRemove() {
+    if (!settings) return;
+    setUploading(true);
+    await supabase.from("app_settings").update({ background_photo_path: null }).eq("id", settings.id);
+    setUploading(false);
     router.refresh();
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="company_name">Company Name *</Label>
-            <Input id="company_name" {...register("company_name")} />
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ImageIcon className="h-4 w-4" /> Background Photo
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Upload a photo to show as a faded background across the app. It&apos;s washed out so the page stays easy to read.
+        </p>
+
+        {settings?.background_photo_path && (
+          <div className="flex items-center justify-between gap-3 bg-slate-50 border rounded-md px-3 py-2">
+            <span className="text-sm text-slate-700">Background photo set.</span>
+            <Button type="button" variant="outline" size="sm" onClick={handleRemove} disabled={uploading}>
+              <Trash2 className="h-4 w-4" /> Remove
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="company_address">Address</Label>
-            <Textarea id="company_address" {...register("company_address")} rows={2} placeholder="123 Studio Lane, City, State ZIP" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="company_phone">Phone</Label>
-              <Input id="company_phone" {...register("company_phone")} placeholder="(555) 000-0000" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="company_email">Email</Label>
-              <Input id="company_email" type="email" {...register("company_email")} placeholder="studio@example.com" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="payment_terms">Default Payment Terms</Label>
-            <Textarea id="payment_terms" {...register("payment_terms")} rows={2} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="default_tax_rate">Default Tax Rate (%)</Label>
-            <Input id="default_tax_rate" type="number" step="0.01" {...register("default_tax_rate")} placeholder="8.25" />
-          </div>
-        </CardContent>
-      </Card>
-      <Button type="submit" disabled={isSubmitting}>
-        {saved ? "Saved!" : isSubmitting ? "Saving..." : "Save Settings"}
-      </Button>
-    </form>
+        )}
+
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="block w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200"
+          />
+          <Button type="button" size="sm" onClick={handleUpload} disabled={uploading}>
+            {uploading ? "Uploading..." : "Upload"}
+          </Button>
+        </div>
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </CardContent>
+    </Card>
   );
 }

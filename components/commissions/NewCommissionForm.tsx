@@ -39,7 +39,16 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
       invoice_storage_path:  path,
       amount:                amount ? parseFloat(amount) : null,
       status:                "pending",
+      submitted_at:          new Date().toISOString(),
     });
+
+    if (jobMode === "existing" && jobId) {
+      await supabase.from("job_notes").insert({
+        job_id:  jobId,
+        author:  "designer",
+        content: "Internal invoice submitted",
+      });
+    }
 
     setUploading(false);
     setOpen(false);

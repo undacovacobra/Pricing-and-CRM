@@ -13,7 +13,7 @@ interface CommissionWithJob extends DesignerCommission {
   job: { title: string; customer: { first_name: string; last_name: string } | null } | null;
 }
 
-export function CommissionList({ commissions }: { commissions: CommissionWithJob[] }) {
+export function CommissionList({ commissions, isOwner }: { commissions: CommissionWithJob[]; isOwner: boolean }) {
   const pending = commissions.filter((c) => c.status === "pending");
   const paid = commissions.filter((c) => c.status === "paid");
 
@@ -29,7 +29,7 @@ export function CommissionList({ commissions }: { commissions: CommissionWithJob
             <p className="text-sm text-muted-foreground text-center py-4">No pending commissions.</p>
           )}
           {pending.map((c) => (
-            <CommissionRow key={c.id} commission={c} />
+            <CommissionRow key={c.id} commission={c} isOwner={isOwner} />
           ))}
         </CardContent>
       </Card>
@@ -65,7 +65,7 @@ export function CommissionList({ commissions }: { commissions: CommissionWithJob
   );
 }
 
-function CommissionRow({ commission: c }: { commission: CommissionWithJob }) {
+function CommissionRow({ commission: c, isOwner }: { commission: CommissionWithJob; isOwner: boolean }) {
   const router = useRouter();
   const supabase = createClient();
   const [paying, setPaying] = useState(false);
@@ -109,13 +109,15 @@ function CommissionRow({ commission: c }: { commission: CommissionWithJob }) {
           >
             View Invoice
           </a>
-          <Button size="sm" onClick={() => setPaying(!paying)}>
-            Mark Paid
-          </Button>
+          {isOwner && (
+            <Button size="sm" onClick={() => setPaying(!paying)}>
+              Mark Paid
+            </Button>
+          )}
         </div>
       </div>
 
-      {paying && (
+      {paying && isOwner && (
         <div className="bg-slate-50 rounded-lg p-3 space-y-3 border">
           <p className="text-sm font-medium">Record Payment</p>
           <div className="grid grid-cols-3 gap-2">

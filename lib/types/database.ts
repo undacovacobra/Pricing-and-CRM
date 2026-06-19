@@ -227,6 +227,7 @@ export interface AppSettings {
   company_logo_path: string | null;
   payment_terms: string | null;
   default_tax_rate: number;
+  background_photo_path: string | null;
   updated_at: string;
 }
 
@@ -308,8 +309,8 @@ export type Database = {
       };
       app_settings: {
         Row: AppSettings;
-        Insert: { company_name: string; company_address?: string | null; company_phone?: string | null; company_email?: string | null; company_logo_path?: string | null; payment_terms?: string | null; default_tax_rate?: number; id?: string; updated_at?: string };
-        Update: { company_name?: string; company_address?: string | null; company_phone?: string | null; company_email?: string | null; company_logo_path?: string | null; payment_terms?: string | null; default_tax_rate?: number; updated_at?: string };
+        Insert: { company_name: string; company_address?: string | null; company_phone?: string | null; company_email?: string | null; company_logo_path?: string | null; payment_terms?: string | null; default_tax_rate?: number; background_photo_path?: string | null; id?: string; updated_at?: string };
+        Update: { company_name?: string; company_address?: string | null; company_phone?: string | null; company_email?: string | null; company_logo_path?: string | null; payment_terms?: string | null; default_tax_rate?: number; background_photo_path?: string | null; updated_at?: string };
         Relationships: [];
       };
     };
