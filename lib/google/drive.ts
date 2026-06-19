@@ -115,25 +115,23 @@ export interface DriveDoc {
   webViewLink: string;
 }
 
-// Uploads a source file (e.g. a .docx) and converts it to a native Google Doc,
-// placed inside parentId. Returns the editable Google Docs link.
-export async function uploadAsGoogleDoc(
+// Uploads a file to Drive as-is (no conversion), placed inside parentId.
+export async function uploadFileToDrive(
   accessToken: string,
   name: string,
   parentId: string | undefined,
   data: ArrayBuffer,
-  sourceMime: string,
+  mimeType: string,
 ): Promise<DriveDoc> {
   const boundary = `crmboundary${Date.now()}`;
   const metadata = {
     name,
-    mimeType: "application/vnd.google-apps.document",
     ...(parentId ? { parents: [parentId] } : {}),
   };
   const enc = new TextEncoder();
   const pre = enc.encode(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-    `--${boundary}\r\nContent-Type: ${sourceMime}\r\n\r\n`,
+    `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
   );
   const post = enc.encode(`\r\n--${boundary}--`);
   const src = new Uint8Array(data);
@@ -150,7 +148,7 @@ export async function uploadAsGoogleDoc(
     },
     body,
   });
-  if (!res.ok) throw new Error(`Google Doc creation failed: ${await res.text()}`);
+  if (!res.ok) throw new Error(`Drive upload failed: ${await res.text()}`);
   return res.json();
 }
 
