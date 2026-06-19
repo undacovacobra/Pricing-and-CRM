@@ -79,14 +79,16 @@ export default async function PricingPage() {
         </CardContent>
       </Card>
 
-      {/* Pricing Items by Category */}
+      {/* Pricing Items by Category — collapsed by default */}
       {categories.map((category) => {
         const categoryItems = items?.filter((i) => i.category === category) ?? [];
         return (
           <Card key={category}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{category}</CardTitle>
-            </CardHeader>
+            <details>
+              <summary className="cursor-pointer list-none px-6 py-4 flex items-center justify-between">
+                <span className="text-base font-semibold">{category}</span>
+                <span className="text-xs text-muted-foreground">{categoryItems.length} items</span>
+              </summary>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -132,6 +134,7 @@ export default async function PricingPage() {
                 </table>
               </div>
             </CardContent>
+            </details>
           </Card>
         );
       })}
