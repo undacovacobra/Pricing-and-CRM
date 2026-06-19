@@ -67,6 +67,14 @@ export interface Job {
   notes: string | null;
   assigned_to: string | null;
   google_drive_folder_url: string | null;
+  retainer_amount: number | null;
+  pay_deposit_paid: boolean;
+  pay_deposit_amount: number | null;
+  pay_delivery_paid: boolean;
+  pay_delivery_amount: number | null;
+  pay_completion_paid: boolean;
+  pay_completion_amount: number | null;
+  change_orders_paid: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -10,6 +10,7 @@ import { MaterialOrdersSection } from "@/components/jobs/MaterialOrdersSection";
 import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
 import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
+import { PaymentTracker } from "@/components/jobs/PaymentTracker";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -62,8 +63,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   // contract / change-order records and their manually-entered amounts.
   const contractAmount = contracts.reduce((sum, c) => sum + (c.amount ?? 0), 0);
   const changeOrderTotal = changeOrders.reduce((sum, c) => sum + (c.amount ?? 0), 0);
-  const totalPaid = (payments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
-  const balanceDue = contractAmount + changeOrderTotal - totalPaid;
 
   const configured = googleConfigured();
   const googleReady = configured && (await getGoogleConnectionStatus()).connected;
@@ -108,20 +107,19 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <p className="text-lg font-bold">{changeOrderTotal ? formatCurrency(changeOrderTotal) : "—"}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Total Paid</p>
-            <p className="text-lg font-bold text-green-700">{formatCurrency(totalPaid)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Balance Due</p>
-            <p className={`text-lg font-bold ${balanceDue > 0 ? "text-orange-600" : "text-green-600"}`}>
-              {formatCurrency(balanceDue)}
-            </p>
-          </CardContent>
-        </Card>
+        <PaymentTracker
+          jobId={id}
+          contractAmount={contractAmount}
+          changeOrderTotal={changeOrderTotal}
+          retainerAmount={job.retainer_amount}
+          payDepositPaid={job.pay_deposit_paid}
+          payDepositAmount={job.pay_deposit_amount}
+          payDeliveryPaid={job.pay_delivery_paid}
+          payDeliveryAmount={job.pay_delivery_amount}
+          payCompletionPaid={job.pay_completion_paid}
+          payCompletionAmount={job.pay_completion_amount}
+          changeOrdersPaid={job.change_orders_paid}
+        />
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
