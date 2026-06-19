@@ -10,6 +10,8 @@ import { MaterialOrdersSection } from "@/components/jobs/MaterialOrdersSection";
 import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
 import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
+import { googleConfigured } from "@/lib/google/drive";
+import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2 } from "lucide-react";
 import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument } from "@/lib/types/database";
@@ -62,6 +64,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const changeOrderTotal = changeOrders.reduce((sum, c) => sum + (c.amount ?? 0), 0);
   const totalPaid = (payments ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
   const balanceDue = contractAmount + changeOrderTotal - totalPaid;
+
+  const configured = googleConfigured();
+  const googleReady = configured && (await getGoogleConnectionStatus()).connected;
 
   return (
     <div className="space-y-6">
@@ -180,7 +185,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <JobAttachmentsSection jobId={id} attachments={(attachments ?? []) as JobAttachment[]} />
+              <JobAttachmentsSection jobId={id} attachments={(attachments ?? []) as JobAttachment[]} googleReady={googleReady} />
             </CardContent>
           </Card>
 
