@@ -36,6 +36,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const defaultCustomerId = job?.customer_id ?? searchParams.get("customer_id") ?? "";
 
@@ -89,6 +90,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
   }, [selectedCustomerId, customers, setValue]);
 
   async function onSubmit(values: FormValues) {
+    setSubmitError(null);
     const data = {
       customer_id:        values.customer_id,
       parent_customer_id: values.parent_customer_id || null,
@@ -105,24 +107,24 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
     };
 
     if (job) {
-      await supabase.from("jobs").update(data).eq("id", job.id);
+      const { error } = await supabase.from("jobs").update(data).eq("id", job.id);
+      if (error) { setSubmitError(error.message); return; }
       router.push(`/jobs/${job.id}`);
     } else {
-      const { data: created } = await supabase.from("jobs").insert(data).select().single();
+      const { data: created, error } = await supabase.from("jobs").insert(data).select().single();
+      if (error || !created?.id) { setSubmitError(error?.message ?? "Failed to create job. Please try again."); return; }
       // Best-effort: auto-create a matching Google Drive folder. No-ops if the
       // user hasn't connected Google Drive or it isn't configured.
-      if (created?.id) {
-        try {
-          await fetch("/api/google/create-folder", {
-            method:  "POST",
-            headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ jobId: created.id }),
-          });
-        } catch {
-          // ignore — folder creation is non-blocking
-        }
+      try {
+        await fetch("/api/google/create-folder", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ jobId: created.id }),
+        });
+      } catch {
+        // ignore — folder creation is non-blocking
       }
-      router.push(`/jobs/${created?.id}`);
+      router.push(`/jobs/${created.id}`);
     }
     router.refresh();
   }
@@ -274,6 +276,9 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
         </CardContent>
       </Card>
 
+      {submitError && (
+        <p className="text-sm text-destructive bg-red-50 border border-red-200 rounded-md px-3 py-2">{submitError}</p>
+      )}
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : job ? "Save Changes" : "Create Job"}
