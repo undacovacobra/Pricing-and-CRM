@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("id, title, google_drive_folder_id")
+    .select("id, title, google_drive_folder_id, parent_customer_id")
     .eq("id", jobId)
     .single();
   if (!job) return NextResponse.json({ error: "job_not_found" }, { status: 404 });
@@ -35,8 +35,20 @@ export async function POST(request: NextRequest) {
   const accessToken = await getValidAccessToken();
   if (!accessToken) return NextResponse.json({ skipped: true, reason: "not_connected" });
 
+  // If this job belongs to a larger customer base (builder/contractor/etc.),
+  // nest its folder inside that customer's master Drive folder.
+  let parentFolderId: string | undefined;
+  if (job.parent_customer_id) {
+    const { data: parent } = await supabase
+      .from("customers")
+      .select("google_drive_folder_id")
+      .eq("id", job.parent_customer_id)
+      .single();
+    parentFolderId = parent?.google_drive_folder_id ?? undefined;
+  }
+
   try {
-    const folder = await createDriveFolder(accessToken, job.title);
+    const folder = await createDriveFolder(accessToken, job.title, parentFolderId);
     await supabase
       .from("jobs")
       .update({

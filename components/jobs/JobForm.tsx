@@ -12,10 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { JOB_STAGES } from "@/components/jobs/JobStageBadge";
-import type { Customer, Job, JobStage } from "@/lib/types/database";
+import { customerName } from "@/lib/utils";
+import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer, type Job, type JobStage } from "@/lib/types/database";
 
 const schema = z.object({
   customer_id:        z.string().min(1, "Customer required"),
+  parent_customer_id: z.string().optional(),
   title:              z.string().min(1, "Job title required"),
   description:        z.string().optional(),
   stage:              z.string().min(1),
@@ -42,6 +44,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
     defaultValues: job
       ? {
           customer_id:        job.customer_id,
+          parent_customer_id: job.parent_customer_id ?? "",
           title:              job.title,
           description:        job.description ?? "",
           stage:              job.stage,
@@ -54,13 +57,19 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
           notes:              job.notes ?? "",
         }
       : {
-          customer_id: defaultCustomerId,
-          stage:       "lead",
-          assigned_to: "owner",
+          customer_id:        defaultCustomerId,
+          parent_customer_id: "",
+          stage:              "lead",
+          assigned_to:        "owner",
         },
   });
 
   const selectedCustomerId = watch("customer_id");
+
+  // Umbrella customers (builders, contractors, etc.) are the selectable
+  // "larger customer bases"; the actual job customer is everyone else.
+  const umbrellaCustomers = customers.filter((c) => UMBRELLA_CUSTOMER_TYPES.includes(c.customer_type));
+  const individualCustomers = customers.filter((c) => !UMBRELLA_CUSTOMER_TYPES.includes(c.customer_type));
 
   // Auto-fill job address from customer address when customer selected and no job address
   const [customerAddress, setCustomerAddress] = useState<string>("");
@@ -73,11 +82,16 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
         .filter(Boolean).join(", ");
       setCustomerAddress(addr);
     }
-  }, [selectedCustomerId, customers]);
+    // Default the larger customer base to whatever this customer belongs to.
+    if (customer?.parent_customer_id) {
+      setValue("parent_customer_id", customer.parent_customer_id);
+    }
+  }, [selectedCustomerId, customers, setValue]);
 
   async function onSubmit(values: FormValues) {
     const data = {
       customer_id:        values.customer_id,
+      parent_customer_id: values.parent_customer_id || null,
       title:              values.title,
       description:        values.description || null,
       stage:              values.stage as JobStage,
@@ -128,9 +142,9 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
                 <SelectValue placeholder="Select a customer..." />
               </SelectTrigger>
               <SelectContent>
-                {customers.map((c) => (
+                {individualCustomers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.first_name} {c.last_name}
+                    {customerName(c)}
                     {c.city ? ` — ${c.city}` : ""}
                   </SelectItem>
                 ))}
@@ -138,6 +152,32 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
             </Select>
             {errors.customer_id && <p className="text-xs text-destructive">{errors.customer_id.message}</p>}
           </div>
+
+          {/* Larger customer base */}
+          {umbrellaCustomers.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Part of a larger customer base?</Label>
+              <Select
+                value={watch("parent_customer_id") || "none"}
+                onValueChange={(v) => setValue("parent_customer_id", v === "none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No — standalone job" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No — standalone job</SelectItem>
+                  {umbrellaCustomers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {customerName(c)} ({CUSTOMER_TYPE_LABELS[c.customer_type]})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                If this job is for a builder/contractor/etc., pick them here so it&apos;s grouped under their master folder.
+              </p>
+            </div>
+          )}
 
           {/* Title */}
           <div className="space-y-1.5">

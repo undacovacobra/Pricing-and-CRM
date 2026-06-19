@@ -32,3 +32,10 @@ export function formatPhoneNumber(phone: string): string {
 export function generateInitials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
+
+// Display name for a customer. Umbrella customers (builders, etc.) store their
+// business name in first_name with an empty last_name, so this collapses to the
+// business name; individuals show "First Last".
+export function customerName(c: { first_name: string; last_name?: string | null }): string {
+  return `${c.first_name}${c.last_name ? ` ${c.last_name}` : ""}`.trim();
+}

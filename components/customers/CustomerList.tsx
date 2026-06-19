@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Phone, Mail, Search } from "lucide-react";
-import { formatPhoneNumber } from "@/lib/utils";
-import type { Customer } from "@/lib/types/database";
+import { formatPhoneNumber, customerName } from "@/lib/utils";
+import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer } from "@/lib/types/database";
 
 interface CustomerWithJobs extends Customer {
   jobs: { id: string; stage: string }[] | null;
@@ -31,6 +31,7 @@ export function CustomerList({ customers }: { customers: CustomerWithJobs[] }) {
         c.state,
         c.zip,
         c.notes,
+        CUSTOMER_TYPE_LABELS[c.customer_type],
       ]
         .filter(Boolean)
         .join(" ")
@@ -79,8 +80,13 @@ export function CustomerList({ customers }: { customers: CustomerWithJobs[] }) {
               <Card className="hover:shadow-md transition-shadow">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="space-y-1">
-                    <p className="font-semibold text-slate-900">
-                      {customer.first_name} {customer.last_name}
+                    <p className="font-semibold text-slate-900 flex items-center gap-2">
+                      {customerName(customer)}
+                      {UMBRELLA_CUSTOMER_TYPES.includes(customer.customer_type) && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                          {CUSTOMER_TYPE_LABELS[customer.customer_type]}
+                        </span>
+                      )}
                     </p>
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                       {customer.phone && (

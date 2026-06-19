@@ -2,16 +2,17 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerForm } from "@/components/customers/CustomerForm";
+import { customerName } from "@/lib/utils";
+import { UMBRELLA_CUSTOMER_TYPES } from "@/lib/types/database";
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [{ data: customer }, { data: parents }] = await Promise.all([
+    supabase.from("customers").select("*").eq("id", id).single(),
+    supabase.from("customers").select("*").in("customer_type", UMBRELLA_CUSTOMER_TYPES).order("first_name"),
+  ]);
 
   if (!customer) notFound();
 
@@ -19,11 +20,11 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
     <div className="max-w-2xl space-y-6">
       <div>
         <Link href={`/customers/${id}`} className="text-sm text-muted-foreground hover:underline">
-          ← {customer.first_name} {customer.last_name}
+          ← {customerName(customer)}
         </Link>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Edit Customer</h1>
       </div>
-      <CustomerForm customer={customer} />
+      <CustomerForm customer={customer} parents={parents ?? []} />
     </div>
   );
 }

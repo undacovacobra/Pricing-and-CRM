@@ -10,6 +10,19 @@ export type JobStage =
 export type DocumentType = "contract" | "invoice" | "change_order" | "quote";
 export type DocumentStatus = "draft" | "sent" | "signed" | "paid" | "void";
 export type CommissionStatus = "pending" | "paid";
+export type CustomerType = "individual" | "builder" | "contractor" | "designer" | "repeat";
+
+// Umbrella customer types — these can have other customers and jobs nested
+// under them, and get an auto-created master Google Drive folder.
+export const UMBRELLA_CUSTOMER_TYPES: CustomerType[] = ["builder", "contractor", "designer", "repeat"];
+
+export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
+  individual: "Individual customer",
+  builder:    "Builder",
+  contractor: "Contractor",
+  designer:   "Designer",
+  repeat:     "Repeat customer",
+};
 
 export interface CabinetLine {
   id: string;
@@ -48,6 +61,10 @@ export interface Customer {
   state: string | null;
   zip: string | null;
   notes: string | null;
+  customer_type: CustomerType;
+  parent_customer_id: string | null;
+  google_drive_folder_id: string | null;
+  google_drive_folder_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,6 +83,7 @@ export interface Job {
   contract_amount: number | null;
   notes: string | null;
   assigned_to: string | null;
+  parent_customer_id: string | null;
   google_drive_folder_url: string | null;
   retainer_amount: number | null;
   pay_deposit_paid: boolean;
@@ -249,14 +267,14 @@ export type Database = {
       };
       customers: {
         Row: Customer;
-        Insert: { first_name: string; last_name: string; email?: string | null; phone?: string | null; address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { first_name?: string; last_name?: string; email?: string | null; phone?: string | null; address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null; notes?: string | null; updated_at?: string };
+        Insert: { first_name: string; last_name: string; email?: string | null; phone?: string | null; address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null; notes?: string | null; customer_type?: CustomerType; parent_customer_id?: string | null; google_drive_folder_id?: string | null; google_drive_folder_url?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { first_name?: string; last_name?: string; email?: string | null; phone?: string | null; address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null; notes?: string | null; customer_type?: CustomerType; parent_customer_id?: string | null; google_drive_folder_id?: string | null; google_drive_folder_url?: string | null; updated_at?: string };
         Relationships: [];
       };
       jobs: {
         Row: Job;
-        Insert: { customer_id: string; title: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; google_drive_folder_url?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { customer_id?: string; title?: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; google_drive_folder_url?: string | null; updated_at?: string };
+        Insert: { customer_id: string; title: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; parent_customer_id?: string | null; google_drive_folder_url?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { customer_id?: string; title?: string; description?: string | null; stage?: JobStage; job_address?: string | null; start_date?: string | null; estimated_end_date?: string | null; actual_end_date?: string | null; estimated_value?: number | null; notes?: string | null; assigned_to?: string | null; parent_customer_id?: string | null; google_drive_folder_url?: string | null; updated_at?: string };
         Relationships: [];
       };
       documents: {

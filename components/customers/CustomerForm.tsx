@@ -9,89 +9,181 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Customer } from "@/lib/types/database";
+import { customerName } from "@/lib/utils";
+import { CUSTOMER_TYPE_LABELS, UMBRELLA_CUSTOMER_TYPES, type Customer, type CustomerType } from "@/lib/types/database";
 
 const schema = z.object({
-  first_name:    z.string().min(1, "First name required"),
-  last_name:     z.string().min(1, "Last name required"),
-  email:         z.string().email("Invalid email").optional().or(z.literal("")),
-  phone:         z.string().optional(),
-  address_line1: z.string().optional(),
-  address_line2: z.string().optional(),
-  city:          z.string().optional(),
-  state:         z.string().optional(),
-  zip:           z.string().optional(),
-  notes:         z.string().optional(),
+  customer_type:      z.enum(["individual", "builder", "contractor", "designer", "repeat"]),
+  parent_customer_id: z.string().optional(),
+  first_name:         z.string().min(1, "Name required"),
+  last_name:          z.string().optional(),
+  email:              z.string().email("Invalid email").optional().or(z.literal("")),
+  phone:              z.string().optional(),
+  address_line1:      z.string().optional(),
+  address_line2:      z.string().optional(),
+  city:               z.string().optional(),
+  state:              z.string().optional(),
+  zip:                z.string().optional(),
+  notes:              z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-export function CustomerForm({ customer }: { customer?: Customer }) {
+export function CustomerForm({ customer, parents }: { customer?: Customer; parents: Customer[] }) {
   const router = useRouter();
   const supabase = createClient();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: customer
       ? {
-          first_name:    customer.first_name,
-          last_name:     customer.last_name,
-          email:         customer.email ?? "",
-          phone:         customer.phone ?? "",
-          address_line1: customer.address_line1 ?? "",
-          address_line2: customer.address_line2 ?? "",
-          city:          customer.city ?? "",
-          state:         customer.state ?? "",
-          zip:           customer.zip ?? "",
-          notes:         customer.notes ?? "",
+          customer_type:      customer.customer_type,
+          parent_customer_id: customer.parent_customer_id ?? "",
+          first_name:         customer.first_name,
+          last_name:          customer.last_name ?? "",
+          email:              customer.email ?? "",
+          phone:              customer.phone ?? "",
+          address_line1:      customer.address_line1 ?? "",
+          address_line2:      customer.address_line2 ?? "",
+          city:               customer.city ?? "",
+          state:              customer.state ?? "",
+          zip:                customer.zip ?? "",
+          notes:              customer.notes ?? "",
         }
-      : {},
+      : { customer_type: "individual", parent_customer_id: "" },
   });
+
+  const customerType = watch("customer_type") as CustomerType;
+  const isUmbrella = UMBRELLA_CUSTOMER_TYPES.includes(customerType);
+  // Don't allow nesting an umbrella under itself when editing.
+  const parentOptions = parents.filter((p) => p.id !== customer?.id);
 
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
+
+    if (!isUmbrella && !values.last_name?.trim()) {
+      setSubmitError("Last name is required for an individual customer.");
+      return;
+    }
+
     const data = {
-      ...values,
-      email:         values.email || null,
-      phone:         values.phone || null,
-      address_line1: values.address_line1 || null,
-      address_line2: values.address_line2 || null,
-      city:          values.city || null,
-      state:         values.state || null,
-      zip:           values.zip || null,
-      notes:         values.notes || null,
+      customer_type:      values.customer_type,
+      parent_customer_id: isUmbrella ? null : (values.parent_customer_id || null),
+      first_name:         values.first_name.trim(),
+      last_name:          isUmbrella ? "" : (values.last_name?.trim() ?? ""),
+      email:              values.email || null,
+      phone:              values.phone || null,
+      address_line1:      values.address_line1 || null,
+      address_line2:      values.address_line2 || null,
+      city:               values.city || null,
+      state:              values.state || null,
+      zip:                values.zip || null,
+      notes:              values.notes || null,
     };
 
     if (customer) {
       const { error } = await supabase.from("customers").update(data).eq("id", customer.id);
       if (error) { setSubmitError(error.message); return; }
+      if (isUmbrella) await ensureCustomerFolder(customer.id);
       router.push(`/customers/${customer.id}`);
     } else {
       const { data: created, error } = await supabase.from("customers").insert(data).select().single();
       if (error || !created?.id) { setSubmitError(error?.message ?? "Failed to save customer. Please try again."); return; }
+      if (isUmbrella) await ensureCustomerFolder(created.id);
       router.push(`/customers/${created.id}`);
     }
     router.refresh();
+  }
+
+  // Best-effort: auto-create a master Drive folder for umbrella customers.
+  // No-ops if Google Drive isn't connected/configured.
+  async function ensureCustomerFolder(customerId: string) {
+    try {
+      await fetch("/api/google/create-customer-folder", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ customerId }),
+      });
+    } catch {
+      // ignore — folder creation is non-blocking
+    }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Card>
         <CardContent className="pt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Customer Type */}
+          <div className="space-y-1.5">
+            <Label>Customer Type</Label>
+            <Select value={customerType} onValueChange={(v) => setValue("customer_type", v as CustomerType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CUSTOMER_TYPE_LABELS) as CustomerType[]).map((t) => (
+                  <SelectItem key={t} value={t}>{CUSTOMER_TYPE_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {isUmbrella
+                ? "This is a larger customer base (e.g. a builder). Individual customers and jobs can be placed under it, and it gets its own master Google Drive folder."
+                : "A regular customer. You can optionally place them under a larger customer base below."}
+            </p>
+          </div>
+
+          {/* Name */}
+          {isUmbrella ? (
             <div className="space-y-1.5">
-              <Label htmlFor="first_name">First Name *</Label>
-              <Input id="first_name" {...register("first_name")} />
+              <Label htmlFor="first_name">Business / Builder Name *</Label>
+              <Input id="first_name" {...register("first_name")} placeholder="e.g. Brista Homes" />
               {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="last_name">Last Name *</Label>
-              <Input id="last_name" {...register("last_name")} />
-              {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="first_name">First Name *</Label>
+                  <Input id="first_name" {...register("first_name")} />
+                  {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="last_name">Last Name *</Label>
+                  <Input id="last_name" {...register("last_name")} />
+                </div>
+              </div>
+
+              {/* Belongs to (larger customer base) */}
+              <div className="space-y-1.5">
+                <Label>Belongs to (larger customer base)</Label>
+                <Select
+                  value={watch("parent_customer_id") || "none"}
+                  onValueChange={(v) => setValue("parent_customer_id", v === "none" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="None — standalone customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None — standalone customer</SelectItem>
+                    {parentOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {customerName(p)} ({CUSTOMER_TYPE_LABELS[p.customer_type]})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {parentOptions.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No larger customer bases yet. Create one by adding a customer of type Builder, Contractor, Designer, or Repeat customer.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
