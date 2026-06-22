@@ -14,7 +14,7 @@ import { PaymentTracker } from "@/components/jobs/PaymentTracker";
 import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
 import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2 } from "lucide-react";
 import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument } from "@/lib/types/database";
 
@@ -165,7 +165,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               {job.assigned_to && (
                 <div>
                   <p className="text-xs text-muted-foreground">Assigned To</p>
-                  <p className="capitalize">{job.assigned_to}</p>
+                  <p>{teamMemberName(job.assigned_to)}</p>
                 </div>
               )}
               {job.notes && (
@@ -322,7 +322,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               {notes?.map((note) => (
                 <div key={note.id} className="border rounded-lg p-3 text-sm">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium capitalize text-xs">{note.author}</span>
+                    <span className="font-medium text-xs">{teamMemberName(note.author)}</span>
                     <span className="text-xs text-muted-foreground">{formatDate(note.created_at)}</span>
                   </div>
                   <p className="text-slate-700">{note.content}</p>

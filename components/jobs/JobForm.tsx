@@ -210,8 +210,8 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="owner">Owner</SelectItem>
-                  <SelectItem value="designer">Designer</SelectItem>
+                  <SelectItem value="owner">Travis</SelectItem>
+                  <SelectItem value="designer">Carol</SelectItem>
                 </SelectContent>
               </Select>
             </div>

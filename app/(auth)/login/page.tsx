@@ -36,8 +36,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Studio CRM</h1>
-          <p className="text-slate-500 text-sm mt-1">Cabinet & Countertop Design Studio</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Coastal Edge Cabinetry and Design" className="h-20 mx-auto mb-2" />
+          <p className="text-slate-500 text-sm mt-1">Cabinetry and Design</p>
         </div>
         <Card>
           <CardHeader>

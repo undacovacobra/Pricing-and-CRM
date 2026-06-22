@@ -39,3 +39,10 @@ export function generateInitials(firstName: string, lastName: string): string {
 export function customerName(c: { first_name: string; last_name?: string | null }): string {
   return `${c.first_name}${c.last_name ? ` ${c.last_name}` : ""}`.trim();
 }
+
+const TEAM_NAMES: Record<string, string> = { owner: "Travis", designer: "Carol" };
+
+export function teamMemberName(value: string | null | undefined): string {
+  if (!value) return "";
+  return TEAM_NAMES[value] ?? value;
+}
