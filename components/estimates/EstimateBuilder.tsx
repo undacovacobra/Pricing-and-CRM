@@ -160,7 +160,7 @@ export function EstimateBuilder({
                     <Input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step="1"
                       value={sel.quantity}
                       onChange={(e) => updateSelection(group.category, { quantity: e.target.value })}
                     />
