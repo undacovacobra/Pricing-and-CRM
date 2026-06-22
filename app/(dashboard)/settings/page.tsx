@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { FolderOpen, CheckCircle2 } from "lucide-react";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { googleConfigured } from "@/lib/google/drive";
+import { adminConfigured } from "@/lib/supabase/admin";
+import { BackupCard } from "@/components/settings/BackupCard";
 
 const BANNERS: Record<string, { text: string; tone: "ok" | "warn" }> = {
   connected:       { text: "Google Drive connected.", tone: "ok" },
@@ -27,6 +29,13 @@ export default async function SettingsPage({
   const status = configured ? await getGoogleConnectionStatus() : { connected: false, email: null };
   const { google } = await searchParams;
   const banner = google ? BANNERS[google] : undefined;
+
+  const { data: lastRun } = await supabase
+    .from("backup_runs")
+    .select("kind, status, detail, created_at")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return (
     <div className="max-w-xl space-y-6">
@@ -87,6 +96,12 @@ export default async function SettingsPage({
           )}
         </CardContent>
       </Card>
+
+      <BackupCard
+        serviceConfigured={adminConfigured()}
+        driveConnected={status.connected}
+        lastRun={lastRun ?? null}
+      />
     </div>
   );
 }

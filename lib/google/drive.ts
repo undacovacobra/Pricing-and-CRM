@@ -191,6 +191,55 @@ export async function uploadAsGoogleDoc(
   return res.json();
 }
 
+// Uploads CSV bytes and converts them to a native Google Sheet, placed inside
+// parentId. Used for the Contacts spreadsheet backup.
+export async function uploadAsGoogleSheet(
+  accessToken: string,
+  name: string,
+  parentId: string | undefined,
+  csv: string,
+): Promise<DriveDoc> {
+  const boundary = `crmboundary${Date.now()}`;
+  const metadata = {
+    name,
+    mimeType: "application/vnd.google-apps.spreadsheet",
+    ...(parentId ? { parents: [parentId] } : {}),
+  };
+  const enc = new TextEncoder();
+  const pre = enc.encode(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Type: text/csv\r\n\r\n`,
+  );
+  const post = enc.encode(`\r\n--${boundary}--`);
+  const src = enc.encode(csv);
+  const body = new Uint8Array(pre.length + src.length + post.length);
+  body.set(pre, 0);
+  body.set(src, pre.length);
+  body.set(post, pre.length + src.length);
+
+  const res = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink`, {
+    method:  "POST",
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body,
+  });
+  if (!res.ok) throw new Error(`Google Sheet creation failed: ${await res.text()}`);
+  return res.json();
+}
+
+// Deletes a Drive file/folder the app created. Ignores 404 (already gone).
+export async function deleteDriveFile(accessToken: string, fileId: string): Promise<void> {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {
+    method:  "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Drive delete failed: ${await res.text()}`);
+  }
+}
+
 // Exports a native Google Doc to a binary format (default .docx) so it can be
 // stored as a job attachment.
 export async function exportGoogleDoc(

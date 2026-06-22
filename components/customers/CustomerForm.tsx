@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,11 +83,13 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
       const { error } = await supabase.from("customers").update(data).eq("id", customer.id);
       if (error) { setSubmitError(error.message); return; }
       if (isUmbrella) await ensureCustomerFolder(customer.id);
+      triggerBackup({ contacts: true });
       router.push(`/customers/${customer.id}`);
     } else {
       const { data: created, error } = await supabase.from("customers").insert(data).select().single();
       if (error || !created?.id) { setSubmitError(error?.message ?? "Failed to save customer. Please try again."); return; }
       if (isUmbrella) await ensureCustomerFolder(created.id);
+      triggerBackup({ contacts: true });
       router.push(`/customers/${created.id}`);
     }
     router.refresh();

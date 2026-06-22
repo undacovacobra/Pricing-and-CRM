@@ -2,6 +2,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +40,7 @@ export function AddNoteForm({ jobId }: { jobId: string }) {
       attachment_storage_path: attachmentPath,
       attachment_file_name:    attachmentFileName,
     });
+    triggerBackup({ jobId });
     setContent("");
     setFile(null);
     if (fileRef.current) fileRef.current.value = "";

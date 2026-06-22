@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,6 +110,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
     if (job) {
       const { error } = await supabase.from("jobs").update(data).eq("id", job.id);
       if (error) { setSubmitError(error.message); return; }
+      triggerBackup({ jobId: job.id });
       router.push(`/jobs/${job.id}`);
     } else {
       const { data: created, error } = await supabase.from("jobs").insert(data).select().single();
@@ -124,6 +126,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
       } catch {
         // ignore — folder creation is non-blocking
       }
+      triggerBackup({ jobId: created.id });
       router.push(`/jobs/${created.id}`);
     }
     router.refresh();

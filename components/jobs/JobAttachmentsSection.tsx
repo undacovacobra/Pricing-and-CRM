@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/utils";
@@ -53,6 +54,7 @@ export function JobAttachmentsSection({ jobId, attachments, googleReady }: { job
     }
 
     if (fileRef.current) fileRef.current.value = "";
+    triggerBackup({ jobId });
     setUploading(false);
     router.refresh();
   }

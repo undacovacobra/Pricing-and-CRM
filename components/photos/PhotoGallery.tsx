@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SUPABASE_URL } from "@/lib/supabase/config";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Camera } from "lucide-react";
@@ -35,6 +36,7 @@ export function PhotoGallery({ jobId, photos }: { jobId: string; photos: JobPhot
       }
     }
 
+    triggerBackup({ jobId });
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
     router.refresh();
