@@ -40,8 +40,8 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen border-r bg-slate-50 fixed left-0 top-0 bottom-0">
       <div className="p-6 border-b">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Coastal Edge Cabinetry and Design" className="w-full h-auto" />
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Coastal Edge Cabinetry and Design</p>
+        <h1 className="font-bold text-lg text-slate-900 mt-0.5">Carol</h1>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
