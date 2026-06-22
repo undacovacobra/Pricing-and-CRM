@@ -4,16 +4,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ItemCombobox } from "@/components/estimates/ItemCombobox";
 import { formatCurrency } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import type { EstimateLineItem, PricingItem } from "@/lib/types/database";
@@ -156,36 +148,11 @@ export function EstimateBuilder({
                 <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
                   <div className="space-y-1.5">
                     <Label>Item</Label>
-                    <Select
+                    <ItemCombobox
+                      subgroups={group.subgroups}
                       value={sel.itemId}
-                      onValueChange={(v) => updateSelection(group.category, { itemId: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose an item..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {group.subgroups.map((sub) =>
-                          sub.subcategory ? (
-                            <SelectGroup key={sub.subcategory}>
-                              <SelectLabel>{sub.subcategory}</SelectLabel>
-                              {sub.items.map((i) => (
-                                <SelectItem key={i.id} value={i.id}>
-                                  {i.name}
-                                  {i.unit_price != null ? ` — ${formatCurrency(i.unit_price)}` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ) : (
-                            sub.items.map((i) => (
-                              <SelectItem key={i.id} value={i.id}>
-                                {i.name}
-                                {i.unit_price != null ? ` — ${formatCurrency(i.unit_price)}` : ""}
-                              </SelectItem>
-                            ))
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
+                      onChange={(id) => updateSelection(group.category, { itemId: id })}
+                    />
                   </div>
 
                   <div className="space-y-1.5 w-24">
