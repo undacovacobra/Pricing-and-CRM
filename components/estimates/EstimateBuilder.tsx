@@ -49,7 +49,7 @@ export function EstimateBuilder({
   const [margin, setMargin] = useState(initialMargin || 0.45);
 
   const priceLevel = priceLevels.find((l) => l.id === priceLevelId) ?? null;
-  const levelMultiplier = priceLevel?.multiplier ?? 1;
+  const levelMultiplier = Number(priceLevel?.multiplier ?? 1) || 1;
 
   function computeSellPrice(item: PricingItem, cost: number) {
     const leveled = item.applies_to_cabinet_lines ? cost * levelMultiplier : cost;
