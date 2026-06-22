@@ -11,7 +11,7 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
 
   const { data: estimate } = await supabase
     .from("estimates")
-    .select("*, job:jobs(id, title, customer:customers(first_name, last_name))")
+    .select("*, job:jobs(id, title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
     .eq("id", id)
     .single();
 

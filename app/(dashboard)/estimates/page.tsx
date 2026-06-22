@@ -10,7 +10,7 @@ export default async function EstimatesPage() {
 
   const { data: estimates } = await supabase
     .from("estimates")
-    .select("*, job:jobs(id, title, customer:customers(first_name, last_name)), estimate_line_items(line_total)")
+    .select("*, job:jobs(id, title, customer:customers!jobs_customer_id_fkey(first_name, last_name)), estimate_line_items(line_total)")
     .order("created_at", { ascending: false });
 
   return (
