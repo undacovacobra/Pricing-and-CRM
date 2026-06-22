@@ -39,7 +39,15 @@ export function ItemCombobox({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
+        <Command
+          filter={(value, search) => {
+            const v = value.toLowerCase();
+            const s = search.toLowerCase().trim();
+            if (!s) return 1;
+            if (v.startsWith(s)) return 1;
+            return 0;
+          }}
+        >
           <CommandInput placeholder="Type a code or name to search..." />
           <CommandList>
             <CommandEmpty>No matching items.</CommandEmpty>
