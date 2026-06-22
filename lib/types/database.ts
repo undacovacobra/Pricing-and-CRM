@@ -35,6 +35,9 @@ export interface CabinetLine {
   updated_at: string;
 }
 
+// Price levels (door style options) reuse the cabinet_lines table/shape.
+export type PriceLevel = CabinetLine;
+
 export interface PricingItem {
   id: string;
   name: string;
@@ -55,6 +58,8 @@ export interface Estimate {
   job_id: string;
   name: string;
   notes: string | null;
+  price_level_id: string | null;
+  margin: number;
   created_at: string;
   updated_at: string;
 }
@@ -292,8 +297,8 @@ export type Database = {
       };
       estimates: {
         Row: Estimate;
-        Insert: { job_id: string; name?: string; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { job_id?: string; name?: string; notes?: string | null; updated_at?: string };
+        Insert: { job_id: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; id?: string; created_at?: string; updated_at?: string };
+        Update: { job_id?: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; updated_at?: string };
         Relationships: [];
       };
       estimate_line_items: {

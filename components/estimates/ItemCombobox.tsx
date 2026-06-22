@@ -63,9 +63,9 @@ export function ItemCombobox({
                 >
                   <Check className={cn("mr-2 h-4 w-4", item.id === value ? "opacity-100" : "opacity-0")} />
                   <span className="flex-1 truncate">{item.name}</span>
-                  {item.unit_price != null && (
+                  {item.unit_cost != null && (
                     <span className="ml-2 text-xs text-muted-foreground font-mono">
-                      {formatCurrency(item.unit_price)}
+                      {formatCurrency(item.unit_cost)} cost
                     </span>
                   )}
                 </CommandItem>

@@ -4,31 +4,39 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ItemCombobox } from "@/components/estimates/ItemCombobox";
 import { formatCurrency } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
-import type { EstimateLineItem, PricingItem } from "@/lib/types/database";
+import type { EstimateLineItem, PriceLevel, PricingItem } from "@/lib/types/database";
 
 const NO_SUBCATEGORY = "__none__";
+const MARGIN_OPTIONS = [0.5, 0.45, 0.4, 0.35];
 
 type CategoryGroup = {
   category: string;
   subgroups: { subcategory: string | null; items: PricingItem[] }[];
 };
 
-type Selection = { itemId: string; quantity: string; manualPrice: string };
+type Selection = { itemId: string; quantity: string; manualCost: string };
 
-const emptySelection: Selection = { itemId: "", quantity: "1", manualPrice: "" };
+const emptySelection: Selection = { itemId: "", quantity: "1", manualCost: "" };
 
 export function EstimateBuilder({
   estimateId,
   pricingItems,
+  priceLevels,
   initialLineItems,
+  initialPriceLevelId,
+  initialMargin,
 }: {
   estimateId: string;
   pricingItems: PricingItem[];
+  priceLevels: PriceLevel[];
   initialLineItems: EstimateLineItem[];
+  initialPriceLevelId: string | null;
+  initialMargin: number;
 }) {
   const supabase = createClient();
   const [lineItems, setLineItems] = useState<EstimateLineItem[]>(initialLineItems);
@@ -37,6 +45,27 @@ export function EstimateBuilder({
   const [customDesc, setCustomDesc] = useState("");
   const [customAmount, setCustomAmount] = useState("");
   const [savingCustom, setSavingCustom] = useState(false);
+  const [priceLevelId, setPriceLevelId] = useState(initialPriceLevelId ?? priceLevels[0]?.id ?? "");
+  const [margin, setMargin] = useState(initialMargin || 0.45);
+
+  const priceLevel = priceLevels.find((l) => l.id === priceLevelId) ?? null;
+  const levelMultiplier = priceLevel?.multiplier ?? 1;
+
+  function computeSellPrice(item: PricingItem, cost: number) {
+    const leveled = item.applies_to_cabinet_lines ? cost * levelMultiplier : cost;
+    return margin > 0 ? leveled / margin : leveled;
+  }
+
+  async function handlePriceLevelChange(id: string) {
+    setPriceLevelId(id);
+    await supabase.from("estimates").update({ price_level_id: id }).eq("id", estimateId);
+  }
+
+  async function handleMarginChange(value: string) {
+    const m = parseFloat(value);
+    setMargin(m);
+    await supabase.from("estimates").update({ margin: m }).eq("id", estimateId);
+  }
 
   // Build category -> subcategory -> items structure, preserving sorted order.
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
@@ -86,9 +115,10 @@ export function EstimateBuilder({
     const qtyNum = parseFloat(sel.quantity) || 0;
     if (qtyNum <= 0) return;
 
-    const needsManualPrice = item.unit_price == null;
-    const price = needsManualPrice ? parseFloat(sel.manualPrice) || 0 : item.unit_price ?? 0;
-    if (needsManualPrice && !(price > 0)) return;
+    const needsManualCost = item.unit_cost == null;
+    const cost = needsManualCost ? parseFloat(sel.manualCost) || 0 : item.unit_cost ?? 0;
+    if (needsManualCost && !(cost > 0)) return;
+    const price = computeSellPrice(item, cost);
 
     setSavingCategory(category);
     const { data, error } = await supabase
@@ -156,21 +186,54 @@ export function EstimateBuilder({
 
   return (
     <div className="space-y-6">
+      {/* Price level + margin */}
+      <Card>
+        <CardContent className="pt-6 grid sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label>Price Level</Label>
+            <Select value={priceLevelId} onValueChange={handlePriceLevelChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select price level..." />
+              </SelectTrigger>
+              <SelectContent>
+                {priceLevels.map((level) => (
+                  <SelectItem key={level.id} value={level.id}>{level.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Margin</Label>
+            <Select value={margin.toString()} onValueChange={handleMarginChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select margin..." />
+              </SelectTrigger>
+              <SelectContent>
+                {MARGIN_OPTIONS.map((m) => (
+                  <SelectItem key={m} value={m.toString()}>{Math.round(m * 100)}%</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Category sections */}
       <div className="space-y-4">
         {categoryGroups.map((group) => {
           const sel = getSelection(group.category);
           const selectedItem = sel.itemId ? itemById.get(sel.itemId) ?? null : null;
-          const needsManualPrice = selectedItem != null && selectedItem.unit_price == null;
+          const needsManualCost = selectedItem != null && selectedItem.unit_cost == null;
           const qtyNum = parseFloat(sel.quantity) || 0;
-          const price = needsManualPrice
-            ? parseFloat(sel.manualPrice) || 0
-            : selectedItem?.unit_price ?? 0;
+          const cost = needsManualCost
+            ? parseFloat(sel.manualCost) || 0
+            : selectedItem?.unit_cost ?? 0;
+          const price = selectedItem ? computeSellPrice(selectedItem, cost) : 0;
           const lineTotal = qtyNum * price;
           const canAdd =
             selectedItem != null &&
             qtyNum > 0 &&
-            (!needsManualPrice || parseFloat(sel.manualPrice) > 0);
+            (!needsManualCost || parseFloat(sel.manualCost) > 0);
 
           return (
             <Card key={group.category}>
@@ -199,16 +262,16 @@ export function EstimateBuilder({
                     />
                   </div>
 
-                  {needsManualPrice && (
+                  {needsManualCost && (
                     <div className="space-y-1.5 w-28">
-                      <Label>Price ($)</Label>
+                      <Label>Cost ($)</Label>
                       <Input
                         type="number"
                         min="0"
                         step="0.01"
-                        value={sel.manualPrice}
+                        value={sel.manualCost}
                         onChange={(e) =>
-                          updateSelection(group.category, { manualPrice: e.target.value })
+                          updateSelection(group.category, { manualCost: e.target.value })
                         }
                         placeholder="0.00"
                       />

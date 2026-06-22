@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EstimateBuilder } from "@/components/estimates/EstimateBuilder";
 import { customerName } from "@/lib/utils";
-import type { PricingItem } from "@/lib/types/database";
+import type { PriceLevel, PricingItem } from "@/lib/types/database";
 
 export default async function EstimateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +17,7 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
 
   if (!estimate) notFound();
 
-  const [{ data: lineItems }, { data: pricingItems }] = await Promise.all([
+  const [{ data: lineItems }, { data: pricingItems }, { data: priceLevels }] = await Promise.all([
     supabase
       .from("estimate_line_items")
       .select("*")
@@ -30,6 +30,11 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
       .order("category")
       .order("subcategory")
       .order("name"),
+    supabase
+      .from("cabinet_lines")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order"),
   ]);
 
   const job = estimate.job as { id: string; title: string; customer: { first_name: string; last_name: string | null } | null } | null;
@@ -58,8 +63,12 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
       <EstimateBuilder
         estimateId={estimate.id}
         pricingItems={(pricingItems ?? []) as PricingItem[]}
+        priceLevels={(priceLevels ?? []) as PriceLevel[]}
         initialLineItems={lineItems ?? []}
+        initialPriceLevelId={estimate.price_level_id}
+        initialMargin={estimate.margin}
       />
     </div>
   );
 }
+
