@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Recoleta"', '"Fraunces"', "ui-serif", "Georgia", "serif"],
+        serif: ['"Recoleta"', '"Fraunces"', "ui-serif", "Georgia", "serif"],
+      },
       colors: {
         background:  "hsl(var(--background))",
         foreground:  "hsl(var(--foreground))",
