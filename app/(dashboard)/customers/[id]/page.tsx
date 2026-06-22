@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStageBadge } from "@/components/jobs/JobStageBadge";
+import { DeleteCustomerButton } from "@/components/customers/DeleteCustomerButton";
 import { formatCurrency, formatDate, formatPhoneNumber, customerName } from "@/lib/utils";
 import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen } from "lucide-react";
 import { CUSTOMER_TYPE_LABELS, type CustomerType, type JobStage } from "@/lib/types/database";
@@ -61,12 +62,15 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             )}
           </div>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/customers/${id}/edit`}>
-            <Pencil className="h-4 w-4" />
-            Edit
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/customers/${id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          </Button>
+          <DeleteCustomerButton customerId={id} customerName={customerName(customer)} />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
