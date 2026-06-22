@@ -18,7 +18,9 @@ export function ItemCombobox({
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const allItems = subgroups.flatMap((g) => g.items);
+  const allItems = subgroups
+    .flatMap((g) => g.items)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
   const selected = allItems.find((i) => i.id === value) ?? null;
 
   return (
@@ -41,28 +43,26 @@ export function ItemCombobox({
           <CommandInput placeholder="Type a code or name to search..." />
           <CommandList>
             <CommandEmpty>No matching items.</CommandEmpty>
-            {subgroups.map((sub) => (
-              <CommandGroup key={sub.subcategory ?? "_"} heading={sub.subcategory ?? undefined}>
-                {sub.items.map((item) => (
-                  <CommandItem
-                    key={item.id}
-                    value={item.name}
-                    onSelect={() => {
-                      onChange(item.id);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check className={cn("mr-2 h-4 w-4", item.id === value ? "opacity-100" : "opacity-0")} />
-                    <span className="flex-1 truncate">{item.name}</span>
-                    {item.unit_price != null && (
-                      <span className="ml-2 text-xs text-muted-foreground font-mono">
-                        {formatCurrency(item.unit_price)}
-                      </span>
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
+            <CommandGroup>
+              {allItems.map((item) => (
+                <CommandItem
+                  key={item.id}
+                  value={item.name}
+                  onSelect={() => {
+                    onChange(item.id);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", item.id === value ? "opacity-100" : "opacity-0")} />
+                  <span className="flex-1 truncate">{item.name}</span>
+                  {item.unit_price != null && (
+                    <span className="ml-2 text-xs text-muted-foreground font-mono">
+                      {formatCurrency(item.unit_price)}
+                    </span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
