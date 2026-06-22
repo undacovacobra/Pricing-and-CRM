@@ -26,7 +26,7 @@ const navItems = [
   { href: "/settings",     label: "Settings",    icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -41,7 +41,7 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col w-60 min-h-screen border-r bg-slate-50 fixed left-0 top-0 bottom-0">
       <div className="p-6 border-b">
         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Coastal Edge Cabinetry and Design</p>
-        <h1 className="font-bold text-lg text-slate-900 mt-0.5">Carol</h1>
+        <h1 className="font-bold text-lg text-slate-900 mt-0.5">{userName}</h1>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
