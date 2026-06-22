@@ -1,15 +1,17 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ItemCombobox } from "@/components/estimates/ItemCombobox";
 import { formatCurrency } from "@/lib/utils";
-import { Trash2 } from "lucide-react";
-import type { EstimateLineItem, PriceLevel, PricingItem } from "@/lib/types/database";
+import { Trash2, CheckCircle2 } from "lucide-react";
+import type { EstimateLineItem, EstimateStatus, PriceLevel, PricingItem } from "@/lib/types/database";
 
 const NO_SUBCATEGORY = "__none__";
 const MARGIN_OPTIONS = [0.5, 0.45, 0.4, 0.35];
@@ -25,19 +27,24 @@ const emptySelection: Selection = { itemId: "", quantity: "1", manualCost: "" };
 
 export function EstimateBuilder({
   estimateId,
+  jobId,
   pricingItems,
   priceLevels,
   initialLineItems,
   initialPriceLevelId,
   initialMargin,
+  initialStatus,
 }: {
   estimateId: string;
+  jobId: string;
   pricingItems: PricingItem[];
   priceLevels: PriceLevel[];
   initialLineItems: EstimateLineItem[];
   initialPriceLevelId: string | null;
   initialMargin: number;
+  initialStatus: EstimateStatus;
 }) {
+  const router = useRouter();
   const supabase = createClient();
   const [lineItems, setLineItems] = useState<EstimateLineItem[]>(initialLineItems);
   const [selections, setSelections] = useState<Record<string, Selection>>({});
@@ -47,6 +54,22 @@ export function EstimateBuilder({
   const [savingCustom, setSavingCustom] = useState(false);
   const [priceLevelId, setPriceLevelId] = useState(initialPriceLevelId ?? priceLevels[0]?.id ?? "");
   const [margin, setMargin] = useState(initialMargin || 0.45);
+  const [status, setStatus] = useState<EstimateStatus>(initialStatus);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmitDraft() {
+    setSubmitting(true);
+    const { error } = await supabase
+      .from("estimates")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", estimateId);
+    setSubmitting(false);
+    if (!error) {
+      setStatus("submitted");
+      router.push(`/jobs/${jobId}`);
+      router.refresh();
+    }
+  }
 
   const priceLevel = priceLevels.find((l) => l.id === priceLevelId) ?? null;
   const levelMultiplier = Number(priceLevel?.multiplier ?? 1) || 1;
@@ -391,6 +414,30 @@ export function EstimateBuilder({
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Submit draft */}
+      <Card>
+        <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm">
+            {status === "submitted" ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span className="text-muted-foreground">
+                  This draft has been submitted. Submitting again saves the latest changes.
+                </span>
+                <Badge variant="secondary">Submitted</Badge>
+              </>
+            ) : (
+              <span className="text-muted-foreground">
+                Submit this draft to save it as a pricing iteration on the job.
+              </span>
+            )}
+          </div>
+          <Button onClick={handleSubmitDraft} disabled={submitting || lineItems.length === 0}>
+            {submitting ? "Submitting..." : status === "submitted" ? "Re-submit Draft" : "Submit Draft"}
+          </Button>
         </CardContent>
       </Card>
     </div>

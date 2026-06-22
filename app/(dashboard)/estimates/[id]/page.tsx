@@ -62,11 +62,13 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
 
       <EstimateBuilder
         estimateId={estimate.id}
+        jobId={estimate.job_id}
         pricingItems={(pricingItems ?? []) as PricingItem[]}
         priceLevels={(priceLevels ?? []) as PriceLevel[]}
         initialLineItems={lineItems ?? []}
         initialPriceLevelId={estimate.price_level_id}
         initialMargin={estimate.margin}
+        initialStatus={estimate.status ?? "draft"}
       />
     </div>
   );

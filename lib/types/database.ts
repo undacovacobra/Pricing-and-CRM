@@ -53,6 +53,8 @@ export interface PricingItem {
   updated_at: string;
 }
 
+export type EstimateStatus = "draft" | "submitted";
+
 export interface Estimate {
   id: string;
   job_id: string;
@@ -60,6 +62,8 @@ export interface Estimate {
   notes: string | null;
   price_level_id: string | null;
   margin: number;
+  status: EstimateStatus;
+  submitted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -297,8 +301,8 @@ export type Database = {
       };
       estimates: {
         Row: Estimate;
-        Insert: { job_id: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; id?: string; created_at?: string; updated_at?: string };
-        Update: { job_id?: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; updated_at?: string };
+        Insert: { job_id: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; status?: EstimateStatus; submitted_at?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { job_id?: string; name?: string; notes?: string | null; price_level_id?: string | null; margin?: number; status?: EstimateStatus; submitted_at?: string | null; updated_at?: string };
         Relationships: [];
       };
       estimate_line_items: {

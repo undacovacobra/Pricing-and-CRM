@@ -15,10 +15,10 @@ type JobOption = {
   customer: { first_name: string; last_name: string | null } | null;
 };
 
-export function NewEstimateForm({ jobs }: { jobs: JobOption[] }) {
+export function NewEstimateForm({ jobs, initialJobId = "" }: { jobs: JobOption[]; initialJobId?: string }) {
   const router = useRouter();
   const supabase = createClient();
-  const [jobId, setJobId] = useState("");
+  const [jobId, setJobId] = useState(initialJobId);
   const [name, setName] = useState("Estimate");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

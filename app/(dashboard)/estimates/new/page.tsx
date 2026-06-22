@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewEstimateForm } from "@/components/estimates/NewEstimateForm";
 
-export default async function NewEstimatePage() {
+export default async function NewEstimatePage({ searchParams }: { searchParams: Promise<{ job?: string }> }) {
+  const { job: initialJobId } = await searchParams;
   const supabase = await createClient();
 
   const { data: jobs } = await supabase
@@ -20,6 +21,7 @@ export default async function NewEstimatePage() {
         <p className="text-sm text-muted-foreground">Choose the job this estimate is for.</p>
       </div>
       <NewEstimateForm
+        initialJobId={initialJobId ?? ""}
         jobs={
           (jobs ?? []) as unknown as {
             id: string;

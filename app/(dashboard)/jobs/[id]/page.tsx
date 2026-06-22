@@ -15,7 +15,7 @@ import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
-import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2 } from "lucide-react";
+import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator } from "lucide-react";
 import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument } from "@/lib/types/database";
 
 const documentTypeLabels: Record<DocumentType, string> = {
@@ -47,6 +47,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: materialOrders },
     { data: attachments },
     { data: contractDocs },
+    { data: estimates },
   ] = await Promise.all([
     supabase.from("documents").select("*, document_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_notes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -55,6 +56,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("material_orders").select("*").eq("job_id", id).order("ordered_at", { ascending: false }),
     supabase.from("job_attachments").select("*").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("contract_documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
+    supabase.from("estimates").select("*, estimate_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
   ]);
 
   const contracts = (contractDocs ?? []).filter((d) => d.kind === "contract") as ContractDocument[];
@@ -217,6 +219,52 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Right Column */}
         <div className="md:col-span-2 space-y-4">
+          {/* Estimates and Pricing */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Calculator className="h-4 w-4" /> Estimates and Pricing
+              </CardTitle>
+              <Button asChild size="sm">
+                <Link href={`/estimates/new?job=${id}`}>
+                  <Plus className="h-4 w-4" /> New
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {!estimates?.length && (
+                <p className="text-sm text-muted-foreground text-center py-4">No estimates yet.</p>
+              )}
+              {estimates?.map((est) => {
+                const total = (est.estimate_line_items as { line_total: number | null }[])?.reduce((s, li) => s + (li.line_total ?? 0), 0) ?? 0;
+                const submitted = est.status === "submitted";
+                return (
+                  <Link key={est.id} href={`/estimates/${est.id}`}>
+                    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{est.name}</p>
+                          <span
+                            className={
+                              "text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 " +
+                              (submitted ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")
+                            }
+                          >
+                            {submitted ? "Submitted" : "Draft"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {submitted && est.submitted_at ? `Submitted ${formatDate(est.submitted_at)}` : `Created ${formatDate(est.created_at)}`}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold font-mono shrink-0 pl-3">{formatCurrency(total)}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </CardContent>
+          </Card>
+
           {/* Documents */}
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between">

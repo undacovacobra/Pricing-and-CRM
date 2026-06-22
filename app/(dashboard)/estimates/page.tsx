@@ -43,7 +43,17 @@ export default async function EstimatesPage() {
               <Card className="hover:border-slate-400 transition-colors">
                 <CardContent className="py-4 flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-slate-900">{est.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-slate-900">{est.name}</p>
+                      <span
+                        className={
+                          "text-[10px] px-1.5 py-0.5 rounded-full font-medium " +
+                          (est.status === "submitted" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600")
+                        }
+                      >
+                        {est.status === "submitted" ? "Submitted" : "Draft"}
+                      </span>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {job?.title ?? "—"}
                       {job?.customer ? ` · ${customerName(job.customer)}` : ""}
