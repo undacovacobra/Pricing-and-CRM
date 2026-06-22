@@ -34,6 +34,9 @@ export function EstimateBuilder({
   const [lineItems, setLineItems] = useState<EstimateLineItem[]>(initialLineItems);
   const [selections, setSelections] = useState<Record<string, Selection>>({});
   const [savingCategory, setSavingCategory] = useState<string | null>(null);
+  const [customDesc, setCustomDesc] = useState("");
+  const [customAmount, setCustomAmount] = useState("");
+  const [savingCustom, setSavingCustom] = useState(false);
 
   // Build category -> subcategory -> items structure, preserving sorted order.
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
@@ -108,6 +111,36 @@ export function EstimateBuilder({
     if (!error && data) {
       setLineItems((prev) => [...prev, data as EstimateLineItem]);
       setSelections((prev) => ({ ...prev, [category]: { ...emptySelection } }));
+    }
+  }
+
+  async function handleAddCustom() {
+    const desc = customDesc.trim();
+    const amount = parseFloat(customAmount) || 0;
+    if (!desc || amount <= 0) return;
+
+    setSavingCustom(true);
+    const { data, error } = await supabase
+      .from("estimate_line_items")
+      .insert({
+        estimate_id: estimateId,
+        pricing_item_id: null,
+        section: "Custom Charge",
+        subcategory: null,
+        code: desc,
+        unit: null,
+        quantity: 1,
+        unit_price: amount,
+        sort_order: lineItems.length,
+      })
+      .select("*")
+      .single();
+    setSavingCustom(false);
+
+    if (!error && data) {
+      setLineItems((prev) => [...prev, data as EstimateLineItem]);
+      setCustomDesc("");
+      setCustomAmount("");
     }
   }
 
@@ -204,6 +237,42 @@ export function EstimateBuilder({
             </Card>
           );
         })}
+
+        {/* Custom charge */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Custom Charge</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+              <div className="space-y-1.5">
+                <Label>Description</Label>
+                <Input
+                  value={customDesc}
+                  onChange={(e) => setCustomDesc(e.target.value)}
+                  placeholder="e.g. Delivery fee, custom millwork..."
+                />
+              </div>
+              <div className="space-y-1.5 w-32">
+                <Label>Amount ($)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <Button
+                onClick={handleAddCustom}
+                disabled={savingCustom || !customDesc.trim() || !(parseFloat(customAmount) > 0)}
+              >
+                {savingCustom ? "Adding..." : "Add"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Running line items */}
