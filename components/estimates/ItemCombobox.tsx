@@ -62,12 +62,14 @@ export function ItemCombobox({
                   }}
                 >
                   <Check className={cn("mr-2 h-4 w-4 shrink-0", item.id === value ? "opacity-100" : "opacity-0")} />
-                  <span className="font-medium shrink-0">{item.name}</span>
-                  <span className="flex-1 truncate px-2 text-xs text-muted-foreground">
-                    {item.subcategory ?? ""}
+                  <span className="flex items-baseline gap-1.5 min-w-0 flex-1">
+                    <span className="font-medium shrink-0">{item.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {item.subcategory ?? ""}
+                    </span>
                   </span>
                   {item.unit_cost != null && (
-                    <span className="shrink-0 text-xs text-muted-foreground font-mono">
+                    <span className="shrink-0 pl-2 text-xs text-muted-foreground font-mono">
                       {formatCurrency(item.unit_cost)} cost
                     </span>
                   )}

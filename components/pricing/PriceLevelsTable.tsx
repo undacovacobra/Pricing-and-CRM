@@ -17,8 +17,11 @@ export function PriceLevelsTable({ priceLevels }: { priceLevels: PriceLevel[] })
     if (!(multiplier > 0)) return;
 
     setSavingId(id);
-    await supabase.from("cabinet_lines").update({ multiplier }).eq("id", id);
-    setSavingId(null);
+    try {
+      await supabase.from("cabinet_lines").update({ multiplier }).eq("id", id);
+    } finally {
+      setSavingId(null);
+    }
   }
 
   return (
@@ -45,11 +48,13 @@ export function PriceLevelsTable({ priceLevels }: { priceLevels: PriceLevel[] })
                     type="number"
                     min="0"
                     step="0.01"
-                    value={level.multiplier}
+                    value={Number(level.multiplier)}
                     onChange={(e) => handleMultiplierChange(level.id, e.target.value)}
                     className="w-24 ml-auto text-right"
-                    disabled={savingId === level.id}
                   />
+                  {savingId === level.id && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">Saving...</span>
+                  )}
                 </td>
               </tr>
             ))}

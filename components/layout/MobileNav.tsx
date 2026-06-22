@@ -1,15 +1,18 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Briefcase, FolderOpen, Receipt } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, FolderOpen, Receipt, Tag, Settings, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileNavItems = [
-  { href: "/",            label: "Home",    icon: LayoutDashboard },
-  { href: "/jobs",        label: "Jobs",    icon: Briefcase },
-  { href: "/customers",   label: "Clients", icon: Users },
-  { href: "/documents",   label: "Docs",    icon: FolderOpen },
-  { href: "/commissions", label: "Commiss", icon: Receipt },
+  { href: "/",             label: "Home",     icon: LayoutDashboard },
+  { href: "/jobs",         label: "Jobs",     icon: Briefcase },
+  { href: "/customers",    label: "Clients",  icon: Users },
+  { href: "/estimates",    label: "Estim",    icon: Calculator },
+  { href: "/documents",    label: "Docs",     icon: FolderOpen },
+  { href: "/pricing",      label: "Pricing",  icon: Tag },
+  { href: "/commissions",  label: "Commiss",  icon: Receipt },
+  { href: "/settings",     label: "Settings", icon: Settings },
 ];
 
 export function MobileNav() {
@@ -17,7 +20,7 @@ export function MobileNav() {
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t">
-      <div className="flex">
+      <div className="flex overflow-x-auto">
         {mobileNavItems.map(({ href, label, icon: Icon }) => {
           const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
@@ -25,7 +28,7 @@ export function MobileNav() {
               key={href}
               href={href}
               className={cn(
-                "flex flex-col items-center gap-1 flex-1 py-2.5 text-[10px] font-medium transition-colors",
+                "flex flex-col items-center gap-1 shrink-0 basis-1/5 min-w-[64px] py-2.5 text-[10px] font-medium transition-colors",
                 isActive ? "text-slate-900" : "text-slate-400"
               )}
             >
