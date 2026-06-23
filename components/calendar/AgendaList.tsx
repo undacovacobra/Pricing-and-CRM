@@ -2,23 +2,8 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { teamMemberName } from "@/lib/utils";
 import { MapPin, User, Briefcase } from "lucide-react";
+import { TYPE_LABELS, TYPE_COLORS, mapsLink, timeRange } from "@/components/calendar/eventStyles";
 import type { CalendarEvent } from "@/lib/types/database";
-
-const TYPE_LABELS: Record<string, string> = {
-  appointment: "Appointment",
-  install:     "Installer Visit",
-  personal:    "Personal",
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  appointment: "bg-blue-100 text-blue-700",
-  install:     "bg-amber-100 text-amber-700",
-  personal:    "bg-slate-100 text-slate-600",
-};
-
-function mapsLink(location: string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
-}
 
 function dayKey(iso: string): string {
   const d = new Date(iso);
@@ -33,11 +18,6 @@ function dayHeading(iso: string): string {
   if (dayKey(iso) === dayKey(today.toISOString())) return "Today";
   if (dayKey(iso) === dayKey(tomorrow.toISOString())) return "Tomorrow";
   return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(d);
-}
-
-function timeRange(start: string, end: string | null): string {
-  const fmt = (iso: string) => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
-  return end ? `${fmt(start)} – ${fmt(end)}` : fmt(start);
 }
 
 export function AgendaList({ events, customerLabels }: { events: (CalendarEvent & { customerLabel?: string | null })[]; customerLabels?: Record<string, string> }) {

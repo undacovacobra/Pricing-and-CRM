@@ -61,7 +61,10 @@ export function EventForm({
     event && kindFromAssignedTo(event.assigned_to) === "installer" ? event.assigned_to : "",
   );
   const [location, setLocation] = useState(event?.location ?? defaultJob?.job_address ?? "");
-  const [startTime, setStartTime] = useState(toLocalInput(event?.start_time ?? null));
+  const defaultDate = searchParams.get("date");
+  const [startTime, setStartTime] = useState(
+    event?.start_time ? toLocalInput(event.start_time) : defaultDate ? `${defaultDate}T09:00` : "",
+  );
   const [endTime, setEndTime] = useState(toLocalInput(event?.end_time ?? null));
   const [reminder, setReminder] = useState(
     event?.reminder_minutes_before != null ? String(event.reminder_minutes_before) : "60",
