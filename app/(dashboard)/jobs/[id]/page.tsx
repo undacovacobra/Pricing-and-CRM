@@ -15,8 +15,12 @@ import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
-import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator } from "lucide-react";
-import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument } from "@/lib/types/database";
+import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator, CalendarDays, MapPin } from "lucide-react";
+import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument, CalendarEvent } from "@/lib/types/database";
+
+function mapsLink(location: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
 
 const documentTypeLabels: Record<DocumentType, string> = {
   contract:     "Contract",
@@ -48,6 +52,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: attachments },
     { data: contractDocs },
     { data: estimates },
+    { data: events },
   ] = await Promise.all([
     supabase.from("documents").select("*, document_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_notes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -57,6 +62,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("job_attachments").select("*").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("contract_documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("estimates").select("*, estimate_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
+    supabase.from("calendar_events").select("*").eq("job_id", id).eq("status", "scheduled").order("start_time", { ascending: true }),
   ]);
 
   const contracts = (contractDocs ?? []).filter((d) => d.kind === "contract") as ContractDocument[];
@@ -87,6 +93,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <StageSelector jobId={id} currentStage={job.stage as JobStage} />
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/calendar/new?job=${id}${customer ? `&customer=${customer.id}` : ""}`}>
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Schedule</span>
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/jobs/${id}/edit`}>
               <Pencil className="h-4 w-4" />
@@ -176,6 +188,48 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <p className="text-xs">{job.notes}</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Appointments */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" /> Appointments
+              </CardTitle>
+              <Button asChild size="sm">
+                <Link href={`/calendar/new?job=${id}${customer ? `&customer=${customer.id}` : ""}`}>
+                  <Plus className="h-4 w-4" /> New
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {!events?.length && (
+                <p className="text-sm text-muted-foreground text-center py-4">No appointments scheduled.</p>
+              )}
+              {(events as CalendarEvent[] | null)?.map((event) => (
+                <Link key={event.id} href={`/calendar/${event.id}/edit`}>
+                  <div className="p-3 border rounded-lg hover:bg-slate-50 transition-colors text-sm space-y-1">
+                    <p className="font-medium">{event.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.start_time))}
+                      {" · "}
+                      {teamMemberName(event.assigned_to)}
+                    </p>
+                    {event.location && (
+                      <a
+                        href={mapsLink(event.location)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                      >
+                        <MapPin className="h-3 w-3 shrink-0" /> {event.location}
+                      </a>
+                    )}
+                  </div>
+                </Link>
+              ))}
             </CardContent>
           </Card>
 

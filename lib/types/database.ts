@@ -270,6 +270,28 @@ export interface DesignerCommission {
   updated_at: string;
 }
 
+export type CalendarEventType = "appointment" | "install" | "personal";
+export type CalendarEventStatus = "scheduled" | "cancelled";
+
+export interface CalendarEvent {
+  id: string;
+  event_type: CalendarEventType;
+  title: string;
+  customer_id: string | null;
+  job_id: string | null;
+  assigned_to: string;
+  location: string | null;
+  start_time: string;
+  end_time: string | null;
+  notes: string | null;
+  reminder_minutes_before: number | null;
+  status: CalendarEventStatus;
+  confirmation_sent_at: string | null;
+  reminder_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppSettings {
   id: string;
   company_name: string;
@@ -369,6 +391,12 @@ export type Database = {
         Row: DesignerCommission;
         Insert: { invoice_storage_path: string; job_id?: string | null; job_name_freeform?: string | null; amount?: number | null; status?: CommissionStatus; submitted_at?: string; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; id?: string; created_at?: string; updated_at?: string };
         Update: { invoice_storage_path?: string; job_id?: string | null; job_name_freeform?: string | null; amount?: number | null; status?: CommissionStatus; paid_at?: string | null; paid_amount?: number | null; payment_method?: string | null; notes?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      calendar_events: {
+        Row: CalendarEvent;
+        Insert: { title: string; start_time: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { title?: string; start_time?: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; updated_at?: string };
         Relationships: [];
       };
       app_settings: {

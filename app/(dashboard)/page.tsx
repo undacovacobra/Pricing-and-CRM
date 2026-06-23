@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { JobStageBadge } from "@/components/jobs/JobStageBadge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
 import { Briefcase, Users, FileText, DollarSign, Plus, CheckCircle } from "lucide-react";
 
 export default async function DashboardPage() {
@@ -16,6 +16,7 @@ export default async function DashboardPage() {
     { data: recentDocuments },
     { data: unpaidDocs },
     { data: recentPayments },
+    { data: upcomingEvents },
   ] = await Promise.all([
     supabase
       .from("jobs")
@@ -39,6 +40,13 @@ export default async function DashboardPage() {
       .from("payments")
       .select("*, job:jobs(title, customer:customers!jobs_customer_id_fkey(first_name, last_name))")
       .order("payment_date", { ascending: false })
+      .limit(5),
+    supabase
+      .from("calendar_events")
+      .select("*")
+      .eq("status", "scheduled")
+      .gte("start_time", new Date().toISOString())
+      .order("start_time", { ascending: true })
       .limit(5),
   ]);
 
@@ -197,6 +205,36 @@ export default async function DashboardPage() {
                 </Link>
               );
             })}
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Appointments */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Upcoming Appointments</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/calendar">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!upcomingEvents?.length && (
+              <p className="text-sm text-muted-foreground py-4 text-center">Nothing scheduled.</p>
+            )}
+            {upcomingEvents?.map((event) => (
+              <Link
+                key={event.id}
+                href={`/calendar/${event.id}/edit`}
+                className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{event.title}</p>
+                  <p className="text-xs text-muted-foreground">{teamMemberName(event.assigned_to)}</p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                  {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.start_time))}
+                </span>
+              </Link>
+            ))}
           </CardContent>
         </Card>
 

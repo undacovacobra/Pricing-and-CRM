@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobStageBadge } from "@/components/jobs/JobStageBadge";
 import { DeleteCustomerButton } from "@/components/customers/DeleteCustomerButton";
 import { formatCurrency, formatDate, formatPhoneNumber, customerName } from "@/lib/utils";
-import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen } from "lucide-react";
+import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen, CalendarDays } from "lucide-react";
 import { CUSTOMER_TYPE_LABELS, type CustomerType, type JobStage } from "@/lib/types/database";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -63,6 +63,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/calendar/new?customer=${id}`}>
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Schedule</span>
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/customers/${id}/edit`}>
               <Pencil className="h-4 w-4" />
