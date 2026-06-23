@@ -45,7 +45,7 @@ export function AgendaList({ events, customerLabels }: { events: (CalendarEvent 
     return (
       <Card>
         <CardContent className="py-8 text-center text-muted-foreground text-sm">
-          No upcoming events.
+          No upcoming events scheduled.
         </CardContent>
       </Card>
     );
