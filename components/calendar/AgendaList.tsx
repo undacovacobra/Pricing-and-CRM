@@ -6,7 +6,7 @@ import type { CalendarEvent } from "@/lib/types/database";
 
 const TYPE_LABELS: Record<string, string> = {
   appointment: "Appointment",
-  install:     "Install",
+  install:     "Installer Visit",
   personal:    "Personal",
 };
 
