@@ -52,12 +52,17 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   if (!res.ok) throw new Error(`Resend send failed: ${await res.text()}`);
 }
 
+// The business is in Sarasota, FL. These emails are sent server-side (cron /
+// API routes run on Vercel in UTC), so the time zone must be pinned explicitly
+// or customers would see UTC times instead of the actual Eastern appointment.
+const APP_TIME_ZONE = "America/New_York";
+
 function formatWhen(startTime: string, endTime: string | null): string {
   const start = new Date(startTime);
-  const datePart = start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  const startPart = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const datePart = start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: APP_TIME_ZONE });
+  const startPart = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: APP_TIME_ZONE });
   if (!endTime) return `${datePart} at ${startPart}`;
-  const endPart = new Date(endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const endPart = new Date(endTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: APP_TIME_ZONE });
   return `${datePart}, ${startPart} – ${endPart}`;
 }
 
