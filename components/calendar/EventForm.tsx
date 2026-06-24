@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { customerName } from "@/lib/utils";
+import { CustomerCombobox } from "@/components/calendar/CustomerCombobox";
+import { triggerBackup } from "@/lib/backup/trigger";
 import type { CalendarEvent, CalendarEventType, Customer, Job } from "@/lib/types/database";
 
 const REMINDER_OPTIONS = [
@@ -26,6 +27,18 @@ function toLocalInput(iso: string | null): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function toDateOnly(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function customerAddress(c: Customer | undefined): string {
+  if (!c) return "";
+  return [c.address_line1, c.city, c.state].filter(Boolean).join(", ");
 }
 
 type AssignedKind = "owner" | "designer" | "installer";
@@ -60,12 +73,19 @@ export function EventForm({
   const [installerName, setInstallerName] = useState(
     event && kindFromAssignedTo(event.assigned_to) === "installer" ? event.assigned_to : "",
   );
-  const [location, setLocation] = useState(event?.location ?? defaultJob?.job_address ?? "");
+  const defaultCustomer = customers.find((c) => c.id === defaultCustomerId);
+  const [location, setLocation] = useState(
+    event?.location ?? defaultJob?.job_address ?? customerAddress(defaultCustomer) ?? "",
+  );
   const defaultDate = searchParams.get("date");
   const [startTime, setStartTime] = useState(
     event?.start_time ? toLocalInput(event.start_time) : defaultDate ? `${defaultDate}T09:00` : "",
   );
-  const [endTime, setEndTime] = useState(toLocalInput(event?.end_time ?? null));
+  const isMultiDay = Boolean(event?.end_time && toDateOnly(event.start_time) !== toDateOnly(event.end_time));
+  const [multiDay, setMultiDay] = useState(isMultiDay);
+  const [endDate, setEndDate] = useState(
+    isMultiDay && event?.end_time ? toDateOnly(event.end_time) : "",
+  );
   const [reminder, setReminder] = useState(
     event?.reminder_minutes_before != null ? String(event.reminder_minutes_before) : "60",
   );
@@ -77,8 +97,20 @@ export function EventForm({
   const selectedCustomer = customers.find((c) => c.id === customerId);
   const selectedJob = jobs.find((j) => j.id === jobId);
 
-  function applyAddress(addr: string | null | undefined) {
+  const [locationTouched, setLocationTouched] = useState(Boolean(event?.location));
+
+  useEffect(() => {
+    if (locationTouched) return;
+    const addr = selectedJob?.job_address || customerAddress(selectedCustomer);
     if (addr) setLocation(addr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, jobId]);
+
+  function applyAddress(addr: string | null | undefined) {
+    if (addr) {
+      setLocation(addr);
+      setLocationTouched(true);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -92,6 +124,11 @@ export function EventForm({
 
     const assignedTo = assignedKind === "installer" ? installerName.trim() || "Installer" : assignedKind;
 
+    let endTimeIso: string | null = null;
+    if (multiDay && endDate) {
+      endTimeIso = new Date(`${endDate}T23:59:59`).toISOString();
+    }
+
     const data = {
       event_type:              eventType,
       title:                   title.trim(),
@@ -100,7 +137,7 @@ export function EventForm({
       assigned_to:             assignedTo,
       location:                location.trim() || null,
       start_time:              new Date(startTime).toISOString(),
-      end_time:                endTime ? new Date(endTime).toISOString() : null,
+      end_time:                endTimeIso,
       notes:                   notes.trim() || null,
       reminder_minutes_before: reminder === "none" ? null : Number(reminder),
     };
@@ -113,6 +150,19 @@ export function EventForm({
     } else {
       const { data: created, error: insertErr } = await supabase.from("calendar_events").insert(data).select().single();
       if (insertErr || !created?.id) { setError(insertErr?.message ?? "Failed to save."); setSaving(false); return; }
+
+      if (jobId) {
+        const when = new Date(startTime).toLocaleString("en-US", {
+          weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+        });
+        const whoLabel = assignedKind === "owner" ? "Travis" : assignedKind === "designer" ? "Carol" : assignedTo;
+        await supabase.from("job_notes").insert({
+          job_id:  jobId,
+          author:  "owner",
+          content: `Calendar event scheduled: "${title.trim()}" on ${when} (${whoLabel})${location.trim() ? ` at ${location.trim()}` : ""}.`,
+        });
+        triggerBackup({ jobId });
+      }
 
       if (eventType === "appointment" && customerId) {
         try {
@@ -164,15 +214,7 @@ export function EventForm({
           {eventType !== "personal" && (
             <div className="space-y-1.5">
               <Label>Customer</Label>
-              <Select value={customerId || "none"} onValueChange={(v) => setCustomerId(v === "none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{customerName(c)}{c.city ? ` — ${c.city}` : ""}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CustomerCombobox customers={customers} value={customerId} onChange={setCustomerId} />
               {eventType === "appointment" && customerId && !selectedCustomer?.email && (
                 <p className="text-xs text-orange-600">
                   This customer has no email on file, so no confirmation/reminder emails can be sent.
@@ -235,19 +277,39 @@ export function EventForm({
                 </button>
               )}
             </Label>
-            <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="123 Main St, City, State" />
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                setLocationTouched(true);
+              }}
+              placeholder="123 Main St, City, State"
+            />
           </div>
 
-          {/* Times */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="start_time">Starts *</Label>
-              <Input id="start_time" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="end_time">Ends</Label>
-              <Input id="end_time" type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-            </div>
+          {/* Date */}
+          <div className="space-y-1.5">
+            <Label htmlFor="start_time">Date *</Label>
+            <Input id="start_time" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            <label className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                checked={multiDay}
+                onChange={(e) => {
+                  setMultiDay(e.target.checked);
+                  if (!e.target.checked) setEndDate("");
+                }}
+                className="h-4 w-4 shrink-0"
+              />
+              <span className="text-xs text-slate-600">This event spans multiple days</span>
+            </label>
+            {multiDay && (
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="end_date">End Date</Label>
+                <Input id="end_date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            )}
           </div>
 
           {/* Reminder */}
