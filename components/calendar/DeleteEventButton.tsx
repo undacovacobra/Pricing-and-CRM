@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
+import { triggerBackup } from "@/lib/backup/trigger";
 
 export function DeleteEventButton({ eventId, eventTitle }: { eventId: string; eventTitle: string }) {
   const router = useRouter();
@@ -18,6 +19,7 @@ export function DeleteEventButton({ eventId, eventTitle }: { eventId: string; ev
     setError(null);
     const { error: deleteErr } = await supabase.from("calendar_events").delete().eq("id", eventId);
     if (deleteErr) { setError(deleteErr.message); setDeleting(false); return; }
+    triggerBackup({ calendar: true });
     router.push("/calendar");
     router.refresh();
   }

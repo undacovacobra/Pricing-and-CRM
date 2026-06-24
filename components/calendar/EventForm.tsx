@@ -36,6 +36,13 @@ function toDateOnly(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function toTimeOnly(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function customerAddress(c: Customer | undefined): string {
   if (!c) return "";
   return [c.address_line1, c.city, c.state].filter(Boolean).join(", ");
@@ -86,6 +93,7 @@ export function EventForm({
   const [endDate, setEndDate] = useState(
     isMultiDay && event?.end_time ? toDateOnly(event.end_time) : "",
   );
+  const [endTime, setEndTime] = useState(event?.end_time ? toTimeOnly(event.end_time) : "");
   const [reminder, setReminder] = useState(
     event?.reminder_minutes_before != null ? String(event.reminder_minutes_before) : "60",
   );
@@ -95,8 +103,10 @@ export function EventForm({
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
-  const jobsForCustomer = customerId ? jobs.filter((j) => j.customer_id === customerId) : jobs;
   const selectedJob = jobs.find((j) => j.id === jobId);
+  const jobsForCustomer = customerId
+    ? jobs.filter((j) => j.customer_id === customerId || j.id === jobId)
+    : jobs;
 
   const [locationTouched, setLocationTouched] = useState(Boolean(event?.location));
 
@@ -107,10 +117,11 @@ export function EventForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, jobId]);
 
-  useEffect(() => {
-    if (customerId && jobId && !jobsForCustomer.some((j) => j.id === jobId)) setJobId("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId]);
+  const [prevCustomerId, setPrevCustomerId] = useState(customerId);
+  if (customerId !== prevCustomerId) {
+    setPrevCustomerId(customerId);
+    if (jobId && selectedJob && customerId && selectedJob.customer_id !== customerId) setJobId("");
+  }
 
   function applyAddress(addr: string | null | undefined) {
     if (addr) {
@@ -132,7 +143,10 @@ export function EventForm({
 
     let endTimeIso: string | null = null;
     if (multiDay && endDate) {
-      endTimeIso = new Date(`${endDate}T23:59:59`).toISOString();
+      endTimeIso = new Date(`${endDate}T${endTime || "23:59"}:00`).toISOString();
+    } else if (!multiDay && endTime) {
+      const startDateOnly = startTime.split("T")[0];
+      endTimeIso = new Date(`${startDateOnly}T${endTime}:00`).toISOString();
     }
 
     const data = {
@@ -151,11 +165,13 @@ export function EventForm({
     if (event) {
       const { error: updateErr } = await supabase.from("calendar_events").update(data).eq("id", event.id);
       if (updateErr) { setError(updateErr.message); setSaving(false); return; }
+      triggerBackup({ calendar: true });
       router.push("/calendar");
       router.refresh();
     } else {
       const { data: created, error: insertErr } = await supabase.from("calendar_events").insert(data).select().single();
       if (insertErr || !created?.id) { setError(insertErr?.message ?? "Failed to save."); setSaving(false); return; }
+      triggerBackup({ calendar: true });
 
       if (jobId) {
         const when = new Date(startTime).toLocaleString("en-US", {
@@ -299,8 +315,16 @@ export function EventForm({
 
           {/* Date */}
           <div className="space-y-1.5">
-            <Label htmlFor="start_time">Date *</Label>
-            <Input id="start_time" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="start_time">Date *</Label>
+                <Input id="start_time" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="end_time_only">Ends</Label>
+                <Input id="end_time_only" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              </div>
+            </div>
             <label className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
@@ -317,6 +341,7 @@ export function EventForm({
               <div className="space-y-1.5 pt-1">
                 <Label htmlFor="end_date">End Date</Label>
                 <Input id="end_date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <p className="text-xs text-muted-foreground">The &quot;Ends&quot; time above applies to this end date.</p>
               </div>
             )}
           </div>

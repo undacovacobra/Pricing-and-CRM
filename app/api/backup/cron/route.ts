@@ -28,7 +28,7 @@ async function run(request: NextRequest) {
 
   try {
     const result = await backupEverything(admin, token);
-    await recordRun(admin, "nightly", "success", `Backed up ${result.jobs} jobs, ${result.files} new files, ${result.contacts} contacts.`, result.jobs, result.files);
+    await recordRun(admin, "nightly", "success", `Backed up ${result.jobs} jobs, ${result.files} new files, ${result.contacts} contacts, ${result.calendarEvents} calendar events.`, result.jobs, result.files);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     await recordRun(admin, "nightly", "error", String(e));

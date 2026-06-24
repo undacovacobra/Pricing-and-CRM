@@ -29,6 +29,7 @@ import {
 
 const ROOT_NAME = "Coastal Edge CRM Backup";
 const CONTACTS_SHEET_NAME = "Contacts (Coastal Edge)";
+const CALENDAR_SHEET_NAME = "Calendar Events (Coastal Edge)";
 
 function ownerEmail(): string {
   return process.env.BACKUP_OWNER_EMAIL || "thetravisj1989@gmail.com";
@@ -98,17 +99,19 @@ interface Structure {
   carol: string;
   unassigned: string;
   contacts: string;
+  calendar: string;
 }
 
 async function ensureStructure(admin: SupabaseClient, token: string): Promise<Structure> {
   const root = await ensureFolder(admin, token, "root", ROOT_NAME);
-  const [travis, carol, unassigned, contacts] = await Promise.all([
+  const [travis, carol, unassigned, contacts, calendar] = await Promise.all([
     ensureFolder(admin, token, "folder:travis", "Travis", root),
     ensureFolder(admin, token, "folder:carol", "Carol", root),
     ensureFolder(admin, token, "folder:unassigned", "Unassigned", root),
     ensureFolder(admin, token, "folder:contacts", "Contacts", root),
+    ensureFolder(admin, token, "folder:calendar", "Calendar", root),
   ]);
-  return { root, travis, carol, unassigned, contacts };
+  return { root, travis, carol, unassigned, contacts, calendar };
 }
 
 function personFolder(structure: Structure, assignedTo: string | null): string {
@@ -337,12 +340,67 @@ export async function backupContacts(admin: SupabaseClient, token: string, struc
   return (customers ?? []).length;
 }
 
+// ---- Calendar backup ---------------------------------------------------------
+
+export async function backupCalendar(admin: SupabaseClient, token: string, structure?: Structure) {
+  const struct = structure ?? (await ensureStructure(admin, token));
+  const { data: events } = await admin
+    .from("calendar_events")
+    .select("event_type, title, assigned_to, start_time, end_time, location, notes, status, customer_id, job_id")
+    .order("start_time");
+
+  const customerIds = Array.from(new Set((events ?? []).map((e) => e.customer_id).filter(Boolean)));
+  const jobIds = Array.from(new Set((events ?? []).map((e) => e.job_id).filter(Boolean)));
+  const [{ data: customers }, { data: jobs }] = await Promise.all([
+    customerIds.length
+      ? admin.from("customers").select("id, first_name, last_name").in("id", customerIds)
+      : Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string }[] }),
+    jobIds.length
+      ? admin.from("jobs").select("id, title").in("id", jobIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ]);
+  const customerName: Record<string, string> = {};
+  for (const c of customers ?? []) customerName[c.id] = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+  const jobTitle: Record<string, string> = {};
+  for (const j of jobs ?? []) jobTitle[j.id] = j.title ?? "";
+
+  const who = (v: string | null) => (v === "owner" ? "Travis" : v === "designer" ? "Carol" : v ?? "");
+
+  const header = [
+    "Type", "Title", "Who", "Start", "End", "Location", "Customer", "Job", "Status", "Notes",
+  ];
+  const lines = [header.map(csvCell).join(",")];
+  for (const e of events ?? []) {
+    lines.push(
+      [
+        e.event_type, e.title, who(e.assigned_to),
+        String(e.start_time ?? "").replace("T", " ").slice(0, 16),
+        e.end_time ? String(e.end_time).replace("T", " ").slice(0, 16) : "",
+        e.location, e.customer_id ? customerName[e.customer_id] ?? "" : "",
+        e.job_id ? jobTitle[e.job_id] ?? "" : "", e.status, e.notes,
+      ].map(csvCell).join(","),
+    );
+  }
+  const csv = lines.join("\n");
+
+  const key = "calendar_sheet";
+  const old = await getMapped(admin, key);
+  if (old) {
+    await deleteDriveFile(token, old).catch(() => {});
+    await deleteMapped(admin, key);
+  }
+  const sheet = await uploadAsGoogleSheet(token, CALENDAR_SHEET_NAME, struct.calendar, csv);
+  await setMapped(admin, key, sheet.id, CALENDAR_SHEET_NAME);
+  return (events ?? []).length;
+}
+
 // ---- Full backup ------------------------------------------------------------
 
 export interface BackupResult {
   jobs: number;
   files: number;
   contacts: number;
+  calendarEvents: number;
 }
 
 export async function backupEverything(admin: SupabaseClient, token: string): Promise<BackupResult> {
@@ -353,7 +411,8 @@ export async function backupEverything(admin: SupabaseClient, token: string): Pr
     files += await backupJob(admin, token, j.id as string, structure);
   }
   const contacts = await backupContacts(admin, token, structure);
-  return { jobs: (jobs ?? []).length, files, contacts };
+  const calendarEvents = await backupCalendar(admin, token, structure);
+  return { jobs: (jobs ?? []).length, files, contacts, calendarEvents };
 }
 
 export async function recordRun(
