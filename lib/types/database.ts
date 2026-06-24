@@ -235,6 +235,7 @@ export interface DrawingStroke {
   color: string;
   width: number;
   points: { x: number; y: number }[];
+  erase?: boolean;
 }
 
 export interface JobDrawing {
