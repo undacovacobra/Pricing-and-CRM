@@ -21,6 +21,7 @@ export function BackupCard({
   lastRun: LastRun | null;
 }) {
   const [running, setRunning] = useState(false);
+  const [fixingSharing, setFixingSharing] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
 
   const ready = serviceConfigured && driveConnected;
@@ -43,6 +44,27 @@ export function BackupCard({
       setMessage({ text: String(e), tone: "warn" });
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function fixSharing() {
+    setFixingSharing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/google/fix-sharing", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage({
+          text: `Sharing fixed on ${data.shared} of ${data.total} Drive folders/files — nobody should hit "request access" anymore.`,
+          tone: "ok",
+        });
+      } else {
+        setMessage({ text: data.detail || data.error || "Couldn't fix sharing.", tone: "warn" });
+      }
+    } catch (e) {
+      setMessage({ text: String(e), tone: "warn" });
+    } finally {
+      setFixingSharing(false);
     }
   }
 
@@ -99,10 +121,19 @@ export function BackupCard({
           </div>
         )}
 
-        <Button size="sm" onClick={runBackup} disabled={!ready || running}>
-          <CloudUpload className="h-4 w-4" />
-          {running ? "Backing up…" : "Back up everything now"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={runBackup} disabled={!ready || running}>
+            <CloudUpload className="h-4 w-4" />
+            {running ? "Backing up…" : "Back up everything now"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={fixSharing} disabled={!ready || fixingSharing}>
+            {fixingSharing ? "Fixing sharing…" : "Fix sharing on existing files"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          If a Drive folder or file ever says &quot;you need to request access,&quot; click Fix Sharing — it
+          opens every folder/file the app made to anyone with the link.
+        </p>
       </CardContent>
     </Card>
   );

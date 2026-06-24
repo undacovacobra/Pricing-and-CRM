@@ -91,6 +91,27 @@ export interface DriveFolder {
   webViewLink: string;
 }
 
+// Grants "anyone with the link" access so files/folders never prompt the
+// other teammate (or anyone else with the link) to request access. Throws on
+// failure so callers that need to know (e.g. the bulk fix-sharing route) can
+// retry with a different account's token; call sites that just want
+// best-effort sharing should wrap this in try/catch.
+export async function shareWithAnyone(
+  accessToken: string,
+  fileId: string,
+  role: "reader" | "writer" = "writer",
+): Promise<void> {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false`, {
+    method:  "POST",
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type: "anyone", role }),
+  });
+  if (!res.ok) throw new Error(`Drive sharing failed: ${await res.text()}`);
+}
+
 export async function createDriveFolder(accessToken: string, name: string, parentId?: string): Promise<DriveFolder> {
   const res = await fetch(`${DRIVE_FILES_URL}?fields=id,webViewLink`, {
     method:  "POST",
@@ -105,7 +126,9 @@ export async function createDriveFolder(accessToken: string, name: string, paren
     }),
   });
   if (!res.ok) throw new Error(`Drive folder creation failed: ${await res.text()}`);
-  return res.json();
+  const folder = await res.json();
+  await shareWithAnyone(accessToken, folder.id).catch(() => {});
+  return folder;
 }
 
 const DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
@@ -149,7 +172,9 @@ export async function uploadFileToDrive(
     body,
   });
   if (!res.ok) throw new Error(`Drive upload failed: ${await res.text()}`);
-  return res.json();
+  const file = await res.json();
+  await shareWithAnyone(accessToken, file.id).catch(() => {});
+  return file;
 }
 
 // Uploads a source file (e.g. a .docx) and converts it to a native Google Doc,
@@ -188,7 +213,9 @@ export async function uploadAsGoogleDoc(
     body,
   });
   if (!res.ok) throw new Error(`Google Doc creation failed: ${await res.text()}`);
-  return res.json();
+  const file = await res.json();
+  await shareWithAnyone(accessToken, file.id).catch(() => {});
+  return file;
 }
 
 // Uploads CSV bytes and converts them to a native Google Sheet, placed inside
@@ -226,7 +253,9 @@ export async function uploadAsGoogleSheet(
     body,
   });
   if (!res.ok) throw new Error(`Google Sheet creation failed: ${await res.text()}`);
-  return res.json();
+  const file = await res.json();
+  await shareWithAnyone(accessToken, file.id).catch(() => {});
+  return file;
 }
 
 // Deletes a Drive file/folder the app created. Ignores 404 (already gone).

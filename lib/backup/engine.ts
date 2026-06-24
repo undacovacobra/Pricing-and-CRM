@@ -67,6 +67,11 @@ async function getMapped(admin: SupabaseClient, key: string): Promise<string | n
   return data?.drive_id ?? null;
 }
 
+async function getMappedRow(admin: SupabaseClient, key: string): Promise<{ driveId: string; name: string | null } | null> {
+  const { data } = await admin.from("backup_map").select("drive_id, name").eq("key", key).maybeSingle();
+  return data ? { driveId: data.drive_id, name: data.name } : null;
+}
+
 async function setMapped(admin: SupabaseClient, key: string, driveId: string, name?: string) {
   await admin
     .from("backup_map")
@@ -308,6 +313,34 @@ export async function backupJob(
       // skip individual file failures so one bad file doesn't abort the job
     }
   }
+
+  // Drawing pages — exported as PNGs, re-uploaded whenever a page changes.
+  const { data: drawings } = await admin
+    .from("job_drawings")
+    .select("id, label, thumbnail, updated_at")
+    .eq("job_id", jobId);
+  for (const d of drawings ?? []) {
+    if (!d.thumbnail) continue;
+    const key = `drawing:${d.id}`;
+    const stamp = String(d.updated_at);
+    const existing = await getMappedRow(admin, key);
+    if (existing?.name === stamp) continue;
+    if (existing) {
+      await deleteDriveFile(token, existing.driveId).catch(() => {});
+      await deleteMapped(admin, key);
+    }
+    const base64 = d.thumbnail.split(",").pop() || "";
+    const bytes = Buffer.from(base64, "base64");
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    try {
+      const up = await uploadFileToDrive(token, `${safeName(d.label)}.png`, folderId, buf, "image/png");
+      await setMapped(admin, key, up.id, stamp);
+      copied++;
+    } catch {
+      // skip individual drawing failures
+    }
+  }
+
   return copied;
 }
 
