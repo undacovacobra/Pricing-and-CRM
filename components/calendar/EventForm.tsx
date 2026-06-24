@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CustomerCombobox } from "@/components/calendar/CustomerCombobox";
 import { triggerBackup } from "@/lib/backup/trigger";
 import type { CalendarEvent, CalendarEventType, Customer, Job } from "@/lib/types/database";
+
+const SHOWROOM_ADDRESS = "1900 Main Street Suite 108, Sarasota, FL 34236";
+
+type LocationMode = "customer" | "showroom" | "other";
 
 const REMINDER_OPTIONS = [
   { value: "none", label: "No reminder email" },
@@ -70,7 +74,6 @@ export function EventForm({
 
   const defaultJobId = event?.job_id ?? searchParams.get("job") ?? "";
   const defaultCustomerId = event?.customer_id ?? searchParams.get("customer") ?? "";
-  const defaultJob = jobs.find((j) => j.id === defaultJobId);
 
   const [eventType, setEventType] = useState<CalendarEventType>(event?.event_type ?? "appointment");
   const [title, setTitle] = useState(event?.title ?? "");
@@ -81,8 +84,15 @@ export function EventForm({
     event && kindFromAssignedTo(event.assigned_to) === "installer" ? event.assigned_to : "",
   );
   const defaultCustomer = customers.find((c) => c.id === defaultCustomerId);
-  const [location, setLocation] = useState(
-    event?.location ?? defaultJob?.job_address ?? customerAddress(defaultCustomer) ?? "",
+  const initialLocationMode: LocationMode = (() => {
+    if (!event?.location) return "customer";
+    if (event.location === SHOWROOM_ADDRESS) return "showroom";
+    if (event.location === customerAddress(defaultCustomer)) return "customer";
+    return "other";
+  })();
+  const [locationMode, setLocationMode] = useState<LocationMode>(initialLocationMode);
+  const [customLocation, setCustomLocation] = useState(
+    initialLocationMode === "other" ? event?.location ?? "" : "",
   );
   const defaultDate = searchParams.get("date");
   const [startTime, setStartTime] = useState(
@@ -98,6 +108,7 @@ export function EventForm({
     event?.reminder_minutes_before != null ? String(event.reminder_minutes_before) : "60",
   );
   const [notes, setNotes] = useState(event?.notes ?? "");
+  const [sendEmail, setSendEmail] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
@@ -108,26 +119,18 @@ export function EventForm({
     ? jobs.filter((j) => j.customer_id === customerId || j.id === jobId)
     : jobs;
 
-  const [locationTouched, setLocationTouched] = useState(Boolean(event?.location));
-
-  useEffect(() => {
-    if (locationTouched) return;
-    const addr = selectedJob?.job_address || customerAddress(selectedCustomer);
-    if (addr) setLocation(addr);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId, jobId]);
+  // The actual address sent to the database, derived from the chosen mode.
+  const resolvedLocation =
+    locationMode === "showroom"
+      ? SHOWROOM_ADDRESS
+      : locationMode === "customer"
+        ? customerAddress(selectedCustomer)
+        : customLocation;
 
   const [prevCustomerId, setPrevCustomerId] = useState(customerId);
   if (customerId !== prevCustomerId) {
     setPrevCustomerId(customerId);
     if (jobId && selectedJob && customerId && selectedJob.customer_id !== customerId) setJobId("");
-  }
-
-  function applyAddress(addr: string | null | undefined) {
-    if (addr) {
-      setLocation(addr);
-      setLocationTouched(true);
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -149,13 +152,14 @@ export function EventForm({
       endTimeIso = new Date(`${startDateOnly}T${endTime}:00`).toISOString();
     }
 
+    const finalLocation = resolvedLocation.trim();
     const data = {
       event_type:              eventType,
       title:                   title.trim(),
       customer_id:             customerId || null,
       job_id:                  jobId || null,
       assigned_to:             assignedTo,
-      location:                location.trim() || null,
+      location:                finalLocation || null,
       start_time:              new Date(startTime).toISOString(),
       end_time:                endTimeIso,
       notes:                   notes.trim() || null,
@@ -181,12 +185,12 @@ export function EventForm({
         await supabase.from("job_notes").insert({
           job_id:  jobId,
           author:  "owner",
-          content: `Calendar event scheduled: "${title.trim()}" on ${when} (${whoLabel})${location.trim() ? ` at ${location.trim()}` : ""}.`,
+          content: `Calendar event scheduled: "${title.trim()}" on ${when} (${whoLabel})${finalLocation ? ` at ${finalLocation}` : ""}.`,
         });
         triggerBackup({ jobId });
       }
 
-      if (eventType === "appointment" && customerId) {
+      if (eventType === "appointment" && customerId && sendEmail) {
         try {
           const res = await fetch("/api/calendar/notify", {
             method:  "POST",
@@ -216,6 +220,7 @@ export function EventForm({
               <SelectContent>
                 <SelectItem value="appointment">Customer Appointment</SelectItem>
                 <SelectItem value="install">Install / Job Date</SelectItem>
+                <SelectItem value="delivery">Delivery</SelectItem>
                 <SelectItem value="personal">Personal</SelectItem>
               </SelectContent>
             </Select>
@@ -289,28 +294,34 @@ export function EventForm({
 
           {/* Location */}
           <div className="space-y-1.5">
-            <Label htmlFor="location">
-              Address / Location
-              {selectedCustomer?.address_line1 && (
-                <button type="button" className="ml-2 text-xs text-blue-600 hover:underline" onClick={() => applyAddress([selectedCustomer.address_line1, selectedCustomer.city, selectedCustomer.state].filter(Boolean).join(", "))}>
-                  Use customer address
-                </button>
-              )}
-              {selectedJob?.job_address && (
-                <button type="button" className="ml-2 text-xs text-blue-600 hover:underline" onClick={() => applyAddress(selectedJob.job_address)}>
-                  Use job address
-                </button>
-              )}
-            </Label>
-            <Input
-              id="location"
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
-                setLocationTouched(true);
-              }}
-              placeholder="123 Main St, City, State"
-            />
+            <Label>Where</Label>
+            <Select value={locationMode} onValueChange={(v) => setLocationMode(v as LocationMode)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer">Customer&apos;s house</SelectItem>
+                <SelectItem value="showroom">Showroom</SelectItem>
+                <SelectItem value="other">Somewhere else…</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {locationMode === "customer" && (
+              resolvedLocation
+                ? <p className="text-sm text-slate-600 px-1">{resolvedLocation}</p>
+                : <p className="text-xs text-orange-600 px-1">
+                    {customerId ? "This customer has no address on file." : "Pick a customer above, or choose another location."}
+                  </p>
+            )}
+            {locationMode === "showroom" && (
+              <p className="text-sm text-slate-600 px-1">{SHOWROOM_ADDRESS}</p>
+            )}
+            {locationMode === "other" && (
+              <Input
+                id="location"
+                value={customLocation}
+                onChange={(e) => setCustomLocation(e.target.value)}
+                placeholder="123 Main St, City, State"
+              />
+            )}
           </div>
 
           {/* Date */}
@@ -359,6 +370,21 @@ export function EventForm({
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {/* Send confirmation email (new appointments only) */}
+          {!event && eventType === "appointment" && (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={sendEmail}
+                onChange={(e) => setSendEmail(e.target.checked)}
+                className="h-4 w-4 shrink-0"
+              />
+              <span className="text-sm text-slate-700">
+                Email the customer a confirmation now
+              </span>
+            </label>
           )}
 
           {/* Notes */}

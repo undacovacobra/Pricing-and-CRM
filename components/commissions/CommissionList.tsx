@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { triggerBackup } from "@/lib/backup/trigger";
 import { Trash2 } from "lucide-react";
 import type { DesignerCommission } from "@/lib/types/database";
 
@@ -28,6 +29,7 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
     if (!confirm(`Delete "${commissionTitle(c)}"? This can't be undone.`)) return;
     await supabase.storage.from("commission-invoices").remove([c.invoice_storage_path]);
     await supabase.from("designer_commissions").delete().eq("id", c.id);
+    triggerBackup({ commissions: true });
     router.refresh();
   }
 
@@ -109,6 +111,7 @@ function CommissionRow({
       paid_at:        new Date(paidDate).toISOString(),
       payment_method: method || null,
     }).eq("id", c.id);
+    triggerBackup({ commissions: true });
     setLoading(false);
     setPaying(false);
     router.refresh();

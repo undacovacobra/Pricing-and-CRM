@@ -30,6 +30,7 @@ import {
 const ROOT_NAME = "Coastal Edge CRM Backup";
 const CONTACTS_SHEET_NAME = "Contacts (Coastal Edge)";
 const CALENDAR_SHEET_NAME = "Calendar Events (Coastal Edge)";
+const COMMISSIONS_SHEET_NAME = "Commissions (Coastal Edge)";
 
 function ownerEmail(): string {
   return process.env.BACKUP_OWNER_EMAIL || "thetravisj1989@gmail.com";
@@ -100,18 +101,24 @@ interface Structure {
   unassigned: string;
   contacts: string;
   calendar: string;
+  commissions: string;
+  commissionAttachments: string;
 }
 
 async function ensureStructure(admin: SupabaseClient, token: string): Promise<Structure> {
   const root = await ensureFolder(admin, token, "root", ROOT_NAME);
-  const [travis, carol, unassigned, contacts, calendar] = await Promise.all([
+  const [travis, carol, unassigned, contacts, calendar, commissions] = await Promise.all([
     ensureFolder(admin, token, "folder:travis", "Travis", root),
     ensureFolder(admin, token, "folder:carol", "Carol", root),
     ensureFolder(admin, token, "folder:unassigned", "Unassigned", root),
     ensureFolder(admin, token, "folder:contacts", "Contacts", root),
     ensureFolder(admin, token, "folder:calendar", "Calendar", root),
+    ensureFolder(admin, token, "folder:commissions", "Commissions", root),
   ]);
-  return { root, travis, carol, unassigned, contacts, calendar };
+  const commissionAttachments = await ensureFolder(
+    admin, token, "folder:commission-attachments", "Attachments", commissions,
+  );
+  return { root, travis, carol, unassigned, contacts, calendar, commissions, commissionAttachments };
 }
 
 function personFolder(structure: Structure, assignedTo: string | null): string {
@@ -394,6 +401,78 @@ export async function backupCalendar(admin: SupabaseClient, token: string, struc
   return (events ?? []).length;
 }
 
+// ---- Commissions backup ------------------------------------------------------
+
+export async function backupCommissions(admin: SupabaseClient, token: string, structure?: Structure) {
+  const struct = structure ?? (await ensureStructure(admin, token));
+  const { data: commissions } = await admin
+    .from("designer_commissions")
+    .select("job_id, job_name_freeform, invoice_storage_path, amount, status, submitted_at, paid_at, paid_amount, payment_method, notes")
+    .order("submitted_at");
+
+  const jobIds = Array.from(new Set((commissions ?? []).map((c) => c.job_id).filter(Boolean)));
+  const { data: jobs } = jobIds.length
+    ? await admin.from("jobs").select("id, title").in("id", jobIds)
+    : { data: [] as { id: string; title: string }[] };
+  const jobTitle: Record<string, string> = {};
+  for (const j of jobs ?? []) jobTitle[j.id] = j.title ?? "";
+
+  const describe = (c: Record<string, unknown>) =>
+    (c.notes as string) || (c.job_id ? jobTitle[c.job_id as string] : "") || (c.job_name_freeform as string) || "Commission";
+
+  // Spreadsheet of every commission.
+  const header = [
+    "Description", "Job", "Amount", "Status", "Submitted", "Paid Date", "Paid Amount", "Method", "Attachment", "Notes",
+  ];
+  const lines = [header.map(csvCell).join(",")];
+  for (const c of commissions ?? []) {
+    lines.push(
+      [
+        describe(c),
+        c.job_id ? jobTitle[c.job_id] ?? "" : c.job_name_freeform ?? "",
+        money(c.amount),
+        c.status,
+        String(c.submitted_at ?? "").slice(0, 10),
+        c.paid_at ? String(c.paid_at).slice(0, 10) : "",
+        c.paid_amount != null ? money(c.paid_amount) : "",
+        c.payment_method ?? "",
+        baseName(c.invoice_storage_path ?? ""),
+        c.notes ?? "",
+      ].map(csvCell).join(","),
+    );
+  }
+  const csv = lines.join("\n");
+
+  const key = "commissions_sheet";
+  const old = await getMapped(admin, key);
+  if (old) {
+    await deleteDriveFile(token, old).catch(() => {});
+    await deleteMapped(admin, key);
+  }
+  const sheet = await uploadAsGoogleSheet(token, COMMISSIONS_SHEET_NAME, struct.commissions, csv);
+  await setMapped(admin, key, sheet.id, COMMISSIONS_SHEET_NAME);
+
+  // Copy each invoice file into the Attachments subfolder (once per path).
+  for (const c of commissions ?? []) {
+    const path = c.invoice_storage_path;
+    if (!path) continue;
+    const mapKey = `commissionfile:${path}`;
+    if (await getMapped(admin, mapKey)) continue;
+    const { data: blob, error } = await admin.storage.from("commission-invoices").download(path);
+    if (error || !blob) continue;
+    const buf = await blob.arrayBuffer();
+    const name = safeName(`${describe(c)} - ${baseName(path)}`);
+    try {
+      const up = await uploadFileToDrive(token, name, struct.commissionAttachments, buf, blob.type || "application/octet-stream");
+      await setMapped(admin, mapKey, up.id, name);
+    } catch {
+      // skip individual file failures
+    }
+  }
+
+  return (commissions ?? []).length;
+}
+
 // ---- Full backup ------------------------------------------------------------
 
 export interface BackupResult {
@@ -401,6 +480,7 @@ export interface BackupResult {
   files: number;
   contacts: number;
   calendarEvents: number;
+  commissions: number;
 }
 
 export async function backupEverything(admin: SupabaseClient, token: string): Promise<BackupResult> {
@@ -412,7 +492,8 @@ export async function backupEverything(admin: SupabaseClient, token: string): Pr
   }
   const contacts = await backupContacts(admin, token, structure);
   const calendarEvents = await backupCalendar(admin, token, structure);
-  return { jobs: (jobs ?? []).length, files, contacts, calendarEvents };
+  const commissions = await backupCommissions(admin, token, structure);
+  return { jobs: (jobs ?? []).length, files, contacts, calendarEvents, commissions };
 }
 
 export async function recordRun(

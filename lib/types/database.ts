@@ -270,7 +270,7 @@ export interface DesignerCommission {
   updated_at: string;
 }
 
-export type CalendarEventType = "appointment" | "install" | "personal";
+export type CalendarEventType = "appointment" | "install" | "delivery" | "personal";
 export type CalendarEventStatus = "scheduled" | "cancelled";
 
 export interface CalendarEvent {

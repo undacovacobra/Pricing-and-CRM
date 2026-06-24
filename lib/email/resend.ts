@@ -1,11 +1,21 @@
 // Resend email helpers for appointment confirmations and reminders.
 //
-// Requires RESEND_API_KEY (server-only). Falls back to Resend's shared test
-// sender (onboarding@resend.dev) until a custom domain is verified — set
-// RESEND_FROM_EMAIL (e.g. "Coastal Edge Cabinetry <appointments@coastaledgedesign.com>")
-// once the domain is verified in Resend for branded delivery.
+// Requires RESEND_API_KEY (server-only). Sends from RESEND_FROM_EMAIL once a
+// custom domain is verified in Resend; otherwise falls back to Resend's shared
+// test sender (which only delivers to the account owner's own address).
 
 const RESEND_API_URL = "https://api.resend.com/emails";
+
+// Company details shown in the email header/footer. Pulled from the live site.
+const COMPANY = {
+  name:         "Coastal Edge Cabinetry and Design",
+  address:      "1900 Main Street, Suite 108, Sarasota, FL 34236",
+  phone:        "(941) 280-0414",
+  email:        "info@coastaledgedesign.com",
+  website:      "https://coastaledgedesign.com",
+  websiteLabel: "coastaledgedesign.com",
+  logoUrl:      "https://coastaledgedesign.com/wp-content/uploads/2024/12/coastal-edge-cabinetry-design-logo1-300x90.png",
+};
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
@@ -22,7 +32,13 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       Authorization:  `Bearer ${process.env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: fromAddress(), to, subject, html }),
+    body: JSON.stringify({
+      from:     fromAddress(),
+      to,
+      subject,
+      html,
+      reply_to: COMPANY.email,
+    }),
   });
   if (!res.ok) throw new Error(`Resend send failed: ${await res.text()}`);
 }
@@ -49,39 +65,89 @@ interface AppointmentEmailInput {
   companyPhone: string | null;
 }
 
-export function appointmentConfirmationEmail(input: AppointmentEmailInput): { subject: string; html: string } {
-  const when = formatWhen(input.startTime, input.endTime);
-  return {
-    subject: `Appointment confirmed — ${when}`,
-    html: `
-      <div style="font-family: Georgia, serif; color:#1e293b; max-width:480px;">
-        <h2 style="margin-bottom:4px;">${esc(input.companyName)}</h2>
-        <p style="color:#475569;">Your appointment is confirmed:</p>
-        <p style="font-size:16px;"><strong>${esc(input.title)}</strong><br/>${esc(when)}</p>
-        ${input.location ? `<p><a href="${mapsLink(input.location)}" style="color:#2563eb;">${esc(input.location)}</a></p>` : ""}
-        <p style="color:#475569; font-size:14px; margin-top:24px;">
-          Need to reschedule? Just give us a call${input.companyPhone ? ` at ${esc(input.companyPhone)}` : ""}.
+// Shared, branded email shell: logo header, body, and a footer with the
+// NO-REPLY notice plus full contact details.
+function layout(bodyHtml: string, companyName: string, companyPhone: string | null): string {
+  const name = companyName || COMPANY.name;
+  const phone = companyPhone || COMPANY.phone;
+  return `
+  <div style="background:#f1f5f9; padding:24px 0; font-family: Georgia, 'Times New Roman', serif; color:#1e293b;">
+    <div style="max-width:540px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+      <div style="text-align:center; padding:24px 24px 8px;">
+        <img src="${COMPANY.logoUrl}" alt="${esc(name)}" width="220" style="max-width:220px; height:auto;" />
+      </div>
+      <div style="padding:8px 28px 24px;">
+        ${bodyHtml}
+      </div>
+      <div style="background:#0f172a; color:#cbd5e1; padding:20px 28px; font-size:12px; line-height:1.6;">
+        <p style="margin:0 0 8px; color:#f8fafc; font-weight:bold; font-size:13px;">${esc(name)}</p>
+        <p style="margin:0;">${esc(COMPANY.address)}</p>
+        <p style="margin:0;">${esc(phone)} &nbsp;·&nbsp; <a href="mailto:${COMPANY.email}" style="color:#93c5fd;">${esc(COMPANY.email)}</a></p>
+        <p style="margin:0;"><a href="${COMPANY.website}" style="color:#93c5fd;">${esc(COMPANY.websiteLabel)}</a></p>
+        <p style="margin:12px 0 0; color:#64748b; font-style:italic;">
+          This is an automated message from a no-reply address — please don't reply to this email.
+          To reach us, call ${esc(phone)} or email <a href="mailto:${COMPANY.email}" style="color:#93c5fd;">${esc(COMPANY.email)}</a>.
         </p>
       </div>
-    `,
+    </div>
+  </div>
+  `;
+}
+
+function detailsBlock(input: AppointmentEmailInput): string {
+  const when = formatWhen(input.startTime, input.endTime);
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; margin:16px 0; border-collapse:collapse;">
+      <tr>
+        <td style="padding:6px 0; color:#64748b; width:90px; vertical-align:top;">What</td>
+        <td style="padding:6px 0; font-weight:bold;">${esc(input.title)}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0; color:#64748b; vertical-align:top;">When</td>
+        <td style="padding:6px 0;">${esc(when)}</td>
+      </tr>
+      ${input.location ? `
+      <tr>
+        <td style="padding:6px 0; color:#64748b; vertical-align:top;">Where</td>
+        <td style="padding:6px 0;"><a href="${mapsLink(input.location)}" style="color:#2563eb;">${esc(input.location)}</a></td>
+      </tr>` : ""}
+    </table>
+  `;
+}
+
+export function appointmentConfirmationEmail(input: AppointmentEmailInput): { subject: string; html: string } {
+  const when = formatWhen(input.startTime, input.endTime);
+  const phone = input.companyPhone || COMPANY.phone;
+  const body = `
+    <p style="font-size:18px; margin:0 0 4px;">Your appointment is confirmed</p>
+    <p style="color:#475569; margin:0 0 4px;">We're looking forward to seeing you. Here are the details:</p>
+    ${detailsBlock(input)}
+    <p style="color:#475569; font-size:14px; margin:16px 0 0;">
+      Need to reschedule or have a question? No problem — just give us a call at
+      <strong>${esc(phone)}</strong> and we'll be happy to help find a time that works for you.
+    </p>
+  `;
+  return {
+    subject: `Appointment confirmed — ${when}`,
+    html: layout(body, input.companyName, input.companyPhone),
   };
 }
 
 export function appointmentReminderEmail(input: AppointmentEmailInput): { subject: string; html: string } {
   const when = formatWhen(input.startTime, input.endTime);
+  const phone = input.companyPhone || COMPANY.phone;
+  const body = `
+    <p style="font-size:18px; margin:0 0 4px;">A friendly reminder</p>
+    <p style="color:#475569; margin:0 0 4px;">This is a reminder about your upcoming appointment with us:</p>
+    ${detailsBlock(input)}
+    <p style="color:#475569; font-size:14px; margin:16px 0 0;">
+      We look forward to seeing you! If you need to reschedule or anything comes up,
+      please give us a call at <strong>${esc(phone)}</strong> and we'll take care of it.
+    </p>
+  `;
   return {
     subject: `Reminder: ${input.title} — ${when}`,
-    html: `
-      <div style="font-family: Georgia, serif; color:#1e293b; max-width:480px;">
-        <h2 style="margin-bottom:4px;">${esc(input.companyName)}</h2>
-        <p style="color:#475569;">This is a reminder about your upcoming appointment:</p>
-        <p style="font-size:16px;"><strong>${esc(input.title)}</strong><br/>${esc(when)}</p>
-        ${input.location ? `<p><a href="${mapsLink(input.location)}" style="color:#2563eb;">${esc(input.location)}</a></p>` : ""}
-        <p style="color:#475569; font-size:14px; margin-top:24px;">
-          See you soon!${input.companyPhone ? ` Questions? Call us at ${esc(input.companyPhone)}.` : ""}
-        </p>
-      </div>
-    `,
+    html: layout(body, input.companyName, input.companyPhone),
   };
 }
 

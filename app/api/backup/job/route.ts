@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
-import { backupJob, backupContacts, backupCalendar, getOwnerAccessToken } from "@/lib/backup/engine";
+import { backupJob, backupContacts, backupCalendar, backupCommissions, getOwnerAccessToken } from "@/lib/backup/engine";
 
 export const maxDuration = 60;
 
@@ -17,11 +17,13 @@ export async function POST(request: NextRequest) {
   let jobId: string | undefined;
   let contacts = false;
   let calendar = false;
+  let commissions = false;
   try {
     const body = await request.json();
     jobId = body.jobId;
     contacts = !!body.contacts;
     calendar = !!body.calendar;
+    commissions = !!body.commissions;
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
@@ -35,6 +37,7 @@ export async function POST(request: NextRequest) {
     if (jobId) files = await backupJob(admin, token, jobId);
     if (contacts) await backupContacts(admin, token);
     if (calendar) await backupCalendar(admin, token);
+    if (commissions) await backupCommissions(admin, token);
     return NextResponse.json({ ok: true, files });
   } catch (e) {
     return NextResponse.json({ error: "backup_failed", detail: String(e) }, { status: 502 });

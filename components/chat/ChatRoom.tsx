@@ -47,6 +47,7 @@ export function ChatRoom({
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // When real push is active, let the service worker handle alerts (it works
@@ -120,15 +121,21 @@ export function ChatRoom({
   async function handleSend() {
     const trimmed = content.trim();
     if (!trimmed && files.length === 0) return;
+    if (!currentEmail) {
+      setError("You appear to be signed out. Refresh the page and sign in again.");
+      return;
+    }
     setSending(true);
+    setError(null);
 
-    const { data: created, error } = await supabase
+    const { data: created, error: insertErr } = await supabase
       .from("chat_messages")
       .insert({ sender_email: currentEmail, content: trimmed || null })
       .select()
       .single();
 
-    if (error || !created?.id) {
+    if (insertErr || !created?.id) {
+      setError(insertErr?.message ?? "Couldn't send your message. Check your connection and try again.");
       setSending(false);
       return;
     }
@@ -204,7 +211,7 @@ export function ChatRoom({
               )}
               <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isMine ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-900"}`}>
-                  {!isMine && <p className="text-xs font-semibold mb-0.5 opacity-70">{senderName}</p>}
+                  <p className={`text-xs font-semibold mb-0.5 ${isMine ? "text-white/70" : "text-slate-500"}`}>{senderName}</p>
                   {message.content && <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>}
 
                   {message.attachments.map((a) => (
@@ -237,6 +244,7 @@ export function ChatRoom({
       </div>
 
       <div className="border-t p-3 space-y-2">
+        {error && <p className="text-xs text-destructive">{error}</p>}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {files.map((file, i) => (
