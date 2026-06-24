@@ -231,6 +231,24 @@ export interface JobPhoto {
   created_at: string;
 }
 
+export interface DrawingStroke {
+  color: string;
+  width: number;
+  points: { x: number; y: number }[];
+}
+
+export interface JobDrawing {
+  id: string;
+  job_id: string;
+  label: string;
+  strokes: DrawingStroke[];
+  thumbnail: string | null;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Communication {
   id: string;
   customer_id: string;
@@ -394,6 +412,12 @@ export type Database = {
         Row: JobPhoto;
         Insert: { job_id: string; storage_path: string; caption?: string | null; phase?: string | null; uploaded_by?: string | null; id?: string; created_at?: string };
         Update: { caption?: string | null; phase?: string | null };
+        Relationships: [];
+      };
+      job_drawings: {
+        Row: JobDrawing;
+        Insert: { job_id: string; label?: string; strokes?: DrawingStroke[]; thumbnail?: string | null; sort_order?: number; created_by?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { label?: string; strokes?: DrawingStroke[]; thumbnail?: string | null; sort_order?: number; updated_at?: string };
         Relationships: [];
       };
       communications: {

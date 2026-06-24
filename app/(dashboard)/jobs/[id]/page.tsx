@@ -15,8 +15,8 @@ import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
-import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator, CalendarDays, MapPin } from "lucide-react";
-import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument, CalendarEvent } from "@/lib/types/database";
+import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator, CalendarDays, MapPin, PencilRuler } from "lucide-react";
+import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument, CalendarEvent, JobDrawing } from "@/lib/types/database";
 
 function mapsLink(location: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
@@ -53,6 +53,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: contractDocs },
     { data: estimates },
     { data: events },
+    { data: drawings },
   ] = await Promise.all([
     supabase.from("documents").select("*, document_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("job_notes").select("*").eq("job_id", id).order("created_at", { ascending: false }),
@@ -63,6 +64,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("contract_documents").select("*").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("estimates").select("*, estimate_line_items(line_total)").eq("job_id", id).order("created_at", { ascending: false }),
     supabase.from("calendar_events").select("*").eq("job_id", id).eq("status", "scheduled").order("start_time", { ascending: true }),
+    supabase.from("job_drawings").select("*").eq("job_id", id).order("sort_order", { ascending: true }).limit(6),
   ]);
 
   const contracts = (contractDocs ?? []).filter((d) => d.kind === "contract") as ContractDocument[];
@@ -269,6 +271,36 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               </CardContent>
             </Card>
           )}
+
+          {/* Drawings */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <PencilRuler className="h-4 w-4" /> Drawings
+              </CardTitle>
+              <Link href={`/jobs/${id}/drawings`} className="text-xs text-blue-600 hover:underline">View all</Link>
+            </CardHeader>
+            <CardContent>
+              {!drawings?.length && (
+                <p className="text-sm text-muted-foreground text-center py-2">No sketch pages yet.</p>
+              )}
+              {(drawings?.length ?? 0) > 0 && (
+                <div className="grid grid-cols-3 gap-1">
+                  {(drawings as JobDrawing[] | null)?.slice(0, 6).map((d) => (
+                    <Link key={d.id} href={`/jobs/${id}/drawings/${d.id}`}>
+                      <div className="aspect-[4/3] bg-white border rounded overflow-hidden flex items-center justify-center">
+                        {d.thumbnail ? (
+                          <img src={d.thumbnail} alt={d.label} className="w-full h-full object-contain" />
+                        ) : (
+                          <PencilRuler className="h-5 w-5 text-slate-300" />
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Right Column */}
