@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
 
@@ -22,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
       )}
       <div className="relative">
+        <RegisterServiceWorker />
         <Sidebar userName={userName} />
         <main className="md:ml-60 pb-20 md:pb-6">
           <div className="max-w-7xl mx-auto px-4 py-6">

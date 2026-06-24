@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 import { userNameForEmail } from "@/lib/team";
+import { triggerPush } from "@/lib/push/trigger";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Paperclip, Send, FileText, X } from "lucide-react";
@@ -48,15 +49,22 @@ export function ChatRoom({
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // When real push is active, let the service worker handle alerts (it works
+  // even when the app is closed) so we don't double-notify.
+  const pushActiveRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => {
+        pushActiveRef.current = Boolean(sub);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -89,6 +97,7 @@ export function ChatRoom({
   }, [currentEmail]);
 
   function notify(message: ChatMessage) {
+    if (pushActiveRef.current) return; // service-worker push will deliver it
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     if (typeof document !== "undefined" && document.hasFocus()) return;
     const senderName = userNameForEmail(message.sender_email);
@@ -125,6 +134,13 @@ export function ChatRoom({
     }
 
     setMessages((prev) => (prev.some((m) => m.id === created.id) ? prev : [...prev, { ...created, attachments: [] }]));
+
+    triggerPush({
+      title: myName,
+      body:  trimmed || (files.length ? `Sent ${files.length} attachment${files.length > 1 ? "s" : ""}` : "Sent a message"),
+      url:   "/chat",
+      tag:   "chat",
+    });
 
     for (const file of files) {
       const ext = file.name.split(".").pop();
