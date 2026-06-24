@@ -292,6 +292,23 @@ export interface CalendarEvent {
   updated_at: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender_email: string;
+  content: string | null;
+  created_at: string;
+}
+
+export interface ChatAttachment {
+  id: string;
+  message_id: string;
+  storage_path: string;
+  file_name: string;
+  file_type: string | null;
+  file_size: number | null;
+  created_at: string;
+}
+
 export interface AppSettings {
   id: string;
   company_name: string;
