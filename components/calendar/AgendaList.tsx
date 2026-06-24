@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { teamMemberName } from "@/lib/utils";
 import { MapPin, User, Briefcase } from "lucide-react";
-import { TYPE_LABELS, TYPE_COLORS, mapsLink, timeRange } from "@/components/calendar/eventStyles";
+import { TYPE_LABELS, ASSIGNEE_COLORS, assigneeKind, mapsLink, timeRange } from "@/components/calendar/eventStyles";
 import type { CalendarEvent } from "@/lib/types/database";
 
 function dayKey(iso: string): string {
@@ -55,7 +55,7 @@ export function AgendaList({ events, customerLabels }: { events: (CalendarEvent 
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{event.title}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${TYPE_COLORS[event.event_type]}`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${ASSIGNEE_COLORS[assigneeKind(event.assigned_to)]}`}>
                           {TYPE_LABELS[event.event_type]}
                         </span>
                       </div>

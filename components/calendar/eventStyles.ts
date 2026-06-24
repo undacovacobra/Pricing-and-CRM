@@ -16,6 +16,25 @@ export const TYPE_DOT_COLORS: Record<string, string> = {
   personal:    "bg-slate-400",
 };
 
+export type AssigneeKind = "owner" | "designer" | "installer";
+
+export function assigneeKind(assignedTo: string): AssigneeKind {
+  if (assignedTo === "owner" || assignedTo === "designer") return assignedTo;
+  return "installer";
+}
+
+export const ASSIGNEE_COLORS: Record<AssigneeKind, string> = {
+  owner:     "bg-purple-100 text-purple-700",
+  designer:  "bg-pink-100 text-pink-700",
+  installer: "bg-emerald-100 text-emerald-700",
+};
+
+export const ASSIGNEE_DOT_COLORS: Record<AssigneeKind, string> = {
+  owner:     "bg-purple-500",
+  designer:  "bg-pink-500",
+  installer: "bg-emerald-500",
+};
+
 export function mapsLink(location: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 }

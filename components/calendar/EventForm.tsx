@@ -95,6 +95,7 @@ export function EventForm({
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
+  const jobsForCustomer = customerId ? jobs.filter((j) => j.customer_id === customerId) : jobs;
   const selectedJob = jobs.find((j) => j.id === jobId);
 
   const [locationTouched, setLocationTouched] = useState(Boolean(event?.location));
@@ -105,6 +106,11 @@ export function EventForm({
     if (addr) setLocation(addr);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId, jobId]);
+
+  useEffect(() => {
+    if (customerId && jobId && !jobsForCustomer.some((j) => j.id === jobId)) setJobId("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId]);
 
   function applyAddress(addr: string | null | undefined) {
     if (addr) {
@@ -231,11 +237,14 @@ export function EventForm({
                 <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {jobs.map((j) => (
+                  {jobsForCustomer.map((j) => (
                     <SelectItem key={j.id} value={j.id}>{j.title} — {j.customerLabel}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {customerId && jobsForCustomer.length === 0 && (
+                <p className="text-xs text-muted-foreground">This customer has no jobs yet.</p>
+              )}
             </div>
           )}
 

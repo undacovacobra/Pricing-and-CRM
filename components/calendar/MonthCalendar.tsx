@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TYPE_DOT_COLORS, formatTime } from "@/components/calendar/eventStyles";
+import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime } from "@/components/calendar/eventStyles";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
@@ -71,6 +71,12 @@ export function MonthCalendar({
         </div>
       </div>
 
+      <div className="flex items-center gap-4 text-xs text-slate-600">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-purple-500" /> Travis</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-pink-500" /> Carol</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Installer</span>
+      </div>
+
       <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg overflow-hidden border">
         {WEEKDAYS.map((wd) => (
           <div key={wd} className="bg-slate-50 text-center text-[10px] sm:text-xs font-semibold text-slate-500 py-1.5 uppercase tracking-wide">
@@ -98,7 +104,7 @@ export function MonthCalendar({
               <div className="space-y-0.5 overflow-hidden">
                 {visibleEvents.map((event) => (
                   <div key={event.id} className="flex items-center gap-1 text-[9px] sm:text-[10px] leading-tight truncate">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${TYPE_DOT_COLORS[event.event_type]}`} />
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
                     <span className="truncate text-slate-700">
                       <span className="hidden sm:inline">{formatTime(event.start_time)} </span>
                       {event.title}
