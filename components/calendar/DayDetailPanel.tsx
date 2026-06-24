@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { teamMemberName } from "@/lib/utils";
-import { TYPE_LABELS, ASSIGNEE_COLORS, assigneeKind, mapsLink, timeRange } from "@/components/calendar/eventStyles";
+import { TYPE_LABELS, TYPE_COLORS, mapsLink, timeRange } from "@/components/calendar/eventStyles";
 import { MapPin, User, Briefcase, Plus } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
@@ -37,7 +37,7 @@ export function DayDetailPanel({
             <div className="p-3 border rounded-lg hover:bg-slate-50 transition-colors space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{event.title}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${ASSIGNEE_COLORS[assigneeKind(event.assigned_to)]}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-600"}`}>
                   {TYPE_LABELS[event.event_type]}
                 </span>
               </div>

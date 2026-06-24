@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient, adminConfigured } from "@/lib/supabase/admin";
 import { emailConfigured } from "@/lib/email/resend";
-import { runDueReminders } from "@/lib/calendar/notify";
+import { runDueReminders, runDueStaffPush } from "@/lib/calendar/notify";
+
+export const runtime = "nodejs";
 
 // Checks for appointment reminders that are due and emails them. Runs with no
 // user session, so it's protected by the same shared CRON_SECRET as the
@@ -14,12 +16,14 @@ async function run(request: NextRequest) {
   if (auth !== `Bearer ${secret}`) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   if (!adminConfigured()) return NextResponse.json({ error: "not_configured", detail: "SUPABASE_SERVICE_ROLE_KEY is not set." }, { status: 503 });
-  if (!emailConfigured()) return NextResponse.json({ ok: true, sent: 0, skipped: "email_not_configured" });
 
   const admin = createAdminClient();
   try {
-    const sent = await runDueReminders(admin);
-    return NextResponse.json({ ok: true, sent });
+    // Phone push reminders for the team (1h before + at start) — independent of email config.
+    const pushed = await runDueStaffPush(admin);
+    // Customer email reminders only run when Resend is configured.
+    const sent = emailConfigured() ? await runDueReminders(admin) : 0;
+    return NextResponse.json({ ok: true, sent, pushed, emailSkipped: !emailConfigured() });
   } catch (e) {
     return NextResponse.json({ error: "reminder_run_failed", detail: String(e) }, { status: 502 });
   }

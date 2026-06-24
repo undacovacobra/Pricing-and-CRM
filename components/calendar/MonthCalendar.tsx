@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime, localDayKey } from "@/components/calendar/eventStyles";
+import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime, localDayKey, TYPE_COLORS, TYPE_DOT_COLORS, TYPE_LABELS } from "@/components/calendar/eventStyles";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
@@ -70,15 +70,26 @@ export function MonthCalendar({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-slate-600">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-purple-500" /> Travis</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-pink-500" /> Carol</span>
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Installer</span>
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600">
+          <span className="font-medium text-slate-500">Who:</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Travis</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-pink-500" /> Carol</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Installer</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-600">
+          <span className="font-medium text-slate-500">Type:</span>
+          {(["appointment", "install", "delivery", "personal"] as const).map((t) => (
+            <span key={t} className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${TYPE_COLORS[t]}`}>
+              <span className={`h-2 w-2 rounded-full ${TYPE_DOT_COLORS[t]}`} /> {TYPE_LABELS[t]}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg overflow-hidden border">
         {WEEKDAYS.map((wd) => (
-          <div key={wd} className="bg-slate-50 text-center text-[10px] sm:text-xs font-semibold text-slate-500 py-1.5 uppercase tracking-wide">
+          <div key={wd} className="bg-slate-50 text-center text-xs sm:text-sm font-semibold text-slate-500 py-2 uppercase tracking-wide">
             {wd}
           </div>
         ))}
@@ -89,29 +100,32 @@ export function MonthCalendar({
             <Link
               key={cell.key}
               href={`/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
-              className={`bg-white min-h-[72px] sm:min-h-[100px] p-1 sm:p-1.5 flex flex-col gap-0.5 hover:bg-slate-50 transition-colors ${
+              className={`bg-white min-h-[88px] sm:min-h-[120px] p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
                 cell.isSelected ? "ring-2 ring-inset ring-slate-900" : ""
               } ${!cell.inCurrentMonth ? "opacity-40" : ""}`}
             >
               <span
-                className={`text-[11px] sm:text-xs font-medium w-5 h-5 flex items-center justify-center rounded-full ${
+                className={`text-xs sm:text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full ${
                   cell.isToday ? "bg-slate-900 text-white" : "text-slate-700"
                 }`}
               >
                 {cell.date.getDate()}
               </span>
-              <div className="space-y-0.5 overflow-hidden">
+              <div className="space-y-1 overflow-hidden">
                 {visibleEvents.map((event) => (
-                  <div key={event.id} className="flex items-center gap-1 text-[9px] sm:text-[10px] leading-tight truncate">
-                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
-                    <span className="truncate text-slate-700">
-                      <span className="hidden sm:inline">{formatTime(event.start_time)} </span>
+                  <div
+                    key={event.id}
+                    className={`flex items-center gap-1 rounded px-1 py-0.5 text-[11px] sm:text-xs leading-tight truncate ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-700"}`}
+                  >
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
+                    <span className="truncate">
+                      <span className="hidden sm:inline font-semibold">{formatTime(event.start_time)} </span>
                       {event.title}
                     </span>
                   </div>
                 ))}
                 {overflow > 0 && (
-                  <p className="text-[9px] sm:text-[10px] text-muted-foreground pl-2.5">+{overflow} more</p>
+                  <p className="text-[11px] sm:text-xs font-medium text-muted-foreground pl-1">+{overflow} more</p>
                 )}
               </div>
             </Link>

@@ -288,6 +288,10 @@ export interface CalendarEvent {
   status: CalendarEventStatus;
   confirmation_sent_at: string | null;
   reminder_sent_at: string | null;
+  push_1h_sent_at: string | null;
+  push_start_sent_at: string | null;
+  external_source: string | null;
+  external_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -412,8 +416,8 @@ export type Database = {
       };
       calendar_events: {
         Row: CalendarEvent;
-        Insert: { title: string; start_time: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; id?: string; created_at?: string; updated_at?: string };
-        Update: { title?: string; start_time?: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; updated_at?: string };
+        Insert: { title: string; start_time: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; push_1h_sent_at?: string | null; push_start_sent_at?: string | null; external_source?: string | null; external_id?: string | null; id?: string; created_at?: string; updated_at?: string };
+        Update: { title?: string; start_time?: string; event_type?: CalendarEventType; customer_id?: string | null; job_id?: string | null; assigned_to?: string; location?: string | null; end_time?: string | null; notes?: string | null; reminder_minutes_before?: number | null; status?: CalendarEventStatus; confirmation_sent_at?: string | null; reminder_sent_at?: string | null; push_1h_sent_at?: string | null; push_start_sent_at?: string | null; external_source?: string | null; external_id?: string | null; updated_at?: string };
         Relationships: [];
       };
       app_settings: {
