@@ -1,6 +1,7 @@
 // Service worker for the Coastal Edge PWA: enables install + push notifications.
 // Kept intentionally minimal — no offline caching of app data (the app needs a
 // live Supabase connection), just what's required for installability and push.
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v2
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -21,8 +22,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Coastal Edge";
   const options = {
     body: payload.body || "",
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: "/icon-192-v2.png",
+    badge: "/icon-192-v2.png",
     tag: payload.tag || undefined,
     data: { url: payload.url || "/chat" },
     renotify: Boolean(payload.tag),
