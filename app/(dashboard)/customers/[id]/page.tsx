@@ -38,12 +38,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="min-w-0">
           <Link href="/customers" className="text-sm text-muted-foreground hover:underline">
             ← Customers
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 mt-1 truncate">
             {customerName(customer)}
           </h1>
           <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -62,7 +62,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Button asChild variant="outline" size="sm">
             <Link href={`/calendar/new?customer=${id}`}>
               <CalendarDays className="h-4 w-4" />

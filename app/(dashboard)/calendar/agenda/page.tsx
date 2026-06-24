@@ -28,14 +28,14 @@ export default async function CalendarAgendaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <Link href="/calendar" className="text-sm text-muted-foreground hover:underline">
             ← Calendar
           </Link>
           <h1 className="text-2xl font-bold text-slate-900 mt-1">Upcoming Agenda</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm">
             <Link href="/calendar">
               <CalendarDays className="h-4 w-4" /> <span className="hidden sm:inline">Month View</span>

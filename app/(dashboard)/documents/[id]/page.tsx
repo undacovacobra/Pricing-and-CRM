@@ -52,14 +52,14 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link href={`/jobs/${job?.id}`} className="text-sm text-muted-foreground hover:underline">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Link href={`/jobs/${job?.id}`} className="text-sm text-muted-foreground hover:underline truncate block">
             ← {job?.title}
           </Link>
-          <div className="flex items-center gap-3 mt-1">
-            <h1 className="text-2xl font-bold text-slate-900">{doc.document_number}</h1>
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColors[doc.status as DocumentStatus]}`}>
+          <div className="flex flex-wrap items-center gap-3 mt-1">
+            <h1 className="text-2xl font-bold text-slate-900 truncate">{doc.document_number}</h1>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${statusColors[doc.status as DocumentStatus]}`}>
               {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
             </span>
           </div>

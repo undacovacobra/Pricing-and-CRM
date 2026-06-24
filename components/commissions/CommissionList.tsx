@@ -58,15 +58,15 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
           </CardHeader>
           <CardContent className="space-y-2">
             {paid.map((c) => (
-              <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg opacity-70">
-                <div>
-                  <p className="text-sm font-medium">{commissionTitle(c)}</p>
-                  <p className="text-xs text-muted-foreground">
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg opacity-70">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{commissionTitle(c)}</p>
+                  <p className="text-xs text-muted-foreground truncate">
                     {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
                     Submitted {formatDate(c.submitted_at)}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <div className="text-right">
                     <p className="text-sm font-semibold text-green-700">
                       {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
@@ -119,10 +119,10 @@ function CommissionRow({
 
   return (
     <div className="border rounded-lg p-3 space-y-3">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium">{commissionTitle(c)}</p>
-          <p className="text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{commissionTitle(c)}</p>
+          <p className="text-xs text-muted-foreground truncate">
             {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
             Submitted {formatDate(c.submitted_at)}
           </p>
@@ -130,7 +130,7 @@ function CommissionRow({
             <p className="text-sm font-semibold mt-1">{formatCurrency(c.amount)}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <a
             href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
             target="_blank"
@@ -153,7 +153,7 @@ function CommissionRow({
       {paying && isOwner && (
         <div className="bg-slate-50 rounded-lg p-3 space-y-3 border">
           <p className="text-sm font-medium">Record Payment</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Amount Paid ($)</Label>
               <Input

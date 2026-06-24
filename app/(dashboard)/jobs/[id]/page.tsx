@@ -81,7 +81,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/jobs" className="text-sm text-muted-foreground hover:underline">
             ← Jobs
@@ -93,7 +93,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <StageSelector jobId={id} currentStage={job.stage as JobStage} />
           <Button asChild variant="outline" size="sm">
             <Link href={`/calendar/new?job=${id}${customer ? `&customer=${customer.id}` : ""}`}>
@@ -257,7 +257,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <Link href={`/jobs/${id}/photos`} className="text-xs text-blue-600 hover:underline">View all</Link>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
                   {photos?.slice(0, 6).map((photo) => (
                     <div key={photo.id} className="aspect-square bg-slate-200 rounded overflow-hidden">
                       <img
@@ -285,7 +285,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <p className="text-sm text-muted-foreground text-center py-2">No sketch pages yet.</p>
               )}
               {(drawings?.length ?? 0) > 0 && (
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
                   {(drawings as JobDrawing[] | null)?.slice(0, 6).map((d) => (
                     <Link key={d.id} href={`/jobs/${id}/drawings/${d.id}`}>
                       <div className="aspect-[4/3] bg-white border rounded overflow-hidden flex items-center justify-center">

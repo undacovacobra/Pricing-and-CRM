@@ -42,13 +42,13 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/estimates" className="text-sm text-muted-foreground hover:underline">
             ← Estimates
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">{estimate.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold text-slate-900 mt-1 truncate">{estimate.name}</h1>
+          <p className="text-sm text-muted-foreground truncate">
             {job ? (
               <>
                 <Link href={`/jobs/${job.id}`} className="hover:underline">
@@ -61,7 +61,9 @@ export default async function EstimateDetailPage({ params }: { params: Promise<{
             )}
           </p>
         </div>
-        <DeleteEstimateButton estimateId={estimate.id} estimateName={estimate.name} jobId={estimate.job_id} />
+        <div className="shrink-0">
+          <DeleteEstimateButton estimateId={estimate.id} estimateName={estimate.name} jobId={estimate.job_id} />
+        </div>
       </div>
 
       <EstimateBuilder

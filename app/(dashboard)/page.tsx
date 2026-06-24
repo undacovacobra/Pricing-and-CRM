@@ -61,7 +61,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <Button asChild size="sm">
           <Link href="/jobs/new">
@@ -165,12 +165,14 @@ export default async function DashboardPage() {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{job.title}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground truncate">
                     {(job.customer as { first_name: string; last_name: string } | null)?.first_name}{" "}
                     {(job.customer as { first_name: string; last_name: string } | null)?.last_name}
                   </p>
                 </div>
-                <JobStageBadge stage={job.stage} />
+                <div className="shrink-0 ml-2">
+                  <JobStageBadge stage={job.stage} />
+                </div>
               </Link>
             ))}
           </CardContent>
@@ -228,7 +230,7 @@ export default async function DashboardPage() {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{event.title}</p>
-                  <p className="text-xs text-muted-foreground">{teamMemberName(event.assigned_to)}</p>
+                  <p className="text-xs text-muted-foreground truncate">{teamMemberName(event.assigned_to)}</p>
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0 ml-2">
                   {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.start_time))}
