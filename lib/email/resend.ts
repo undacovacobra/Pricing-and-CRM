@@ -11,11 +11,20 @@ const COMPANY = {
   name:         "Coastal Edge Cabinetry and Design",
   address:      "1900 Main Street, Suite 108, Sarasota, FL 34236",
   phone:        "(941) 280-0414",
-  email:        "info@coastaledgedesign.com",
+  emails:       ["Carol@coastaledgedesign.com", "Travis@coastaledgedesign.com"],
   website:      "https://coastaledgedesign.com",
   websiteLabel: "coastaledgedesign.com",
   logoUrl:      "https://coastaledgedesign.com/wp-content/uploads/2024/12/coastal-edge-cabinetry-design-logo1-300x90.png",
 };
+
+// Replies should go to the first real inbox.
+const REPLY_TO_EMAIL = COMPANY.emails[0];
+
+function emailLinks(): string {
+  return COMPANY.emails
+    .map((e) => `<a href="mailto:${e}" style="color:#93c5fd;">${esc(e)}</a>`)
+    .join(" &nbsp;or&nbsp; ");
+}
 
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
@@ -37,7 +46,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
       to,
       subject,
       html,
-      reply_to: COMPANY.email,
+      reply_to: REPLY_TO_EMAIL,
     }),
   });
   if (!res.ok) throw new Error(`Resend send failed: ${await res.text()}`);
@@ -82,11 +91,11 @@ function layout(bodyHtml: string, companyName: string, companyPhone: string | nu
       <div style="background:#0f172a; color:#cbd5e1; padding:20px 28px; font-size:12px; line-height:1.6;">
         <p style="margin:0 0 8px; color:#f8fafc; font-weight:bold; font-size:13px;">${esc(name)}</p>
         <p style="margin:0;">${esc(COMPANY.address)}</p>
-        <p style="margin:0;">${esc(phone)} &nbsp;·&nbsp; <a href="mailto:${COMPANY.email}" style="color:#93c5fd;">${esc(COMPANY.email)}</a></p>
+        <p style="margin:0;">${esc(phone)} &nbsp;·&nbsp; ${emailLinks()}</p>
         <p style="margin:0;"><a href="${COMPANY.website}" style="color:#93c5fd;">${esc(COMPANY.websiteLabel)}</a></p>
         <p style="margin:12px 0 0; color:#64748b; font-style:italic;">
           This is an automated message from a no-reply address — please don't reply to this email.
-          To reach us, call ${esc(phone)} or email <a href="mailto:${COMPANY.email}" style="color:#93c5fd;">${esc(COMPANY.email)}</a>.
+          To reach us, call ${esc(phone)} or email ${emailLinks()}.
         </p>
       </div>
     </div>
