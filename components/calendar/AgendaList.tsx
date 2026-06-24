@@ -3,22 +3,17 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { teamMemberName } from "@/lib/utils";
 import { MapPin, User, Briefcase } from "lucide-react";
-import { TYPE_LABELS, ASSIGNEE_COLORS, assigneeKind, mapsLink, timeRange } from "@/components/calendar/eventStyles";
+import { TYPE_LABELS, ASSIGNEE_COLORS, assigneeKind, mapsLink, timeRange, localDayKey, APP_TIME_ZONE } from "@/components/calendar/eventStyles";
 import type { CalendarEvent } from "@/lib/types/database";
-
-function dayKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
 
 function dayHeading(iso: string): string {
   const d = new Date(iso);
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(today.getDate() + 1);
-  if (dayKey(iso) === dayKey(today.toISOString())) return "Today";
-  if (dayKey(iso) === dayKey(tomorrow.toISOString())) return "Tomorrow";
-  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric" }).format(d);
+  if (localDayKey(iso) === localDayKey(today.toISOString())) return "Today";
+  if (localDayKey(iso) === localDayKey(tomorrow.toISOString())) return "Tomorrow";
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: APP_TIME_ZONE }).format(d);
 }
 
 export function AgendaList({ events, customerLabels }: { events: (CalendarEvent & { customerLabel?: string | null })[]; customerLabels?: Record<string, string> }) {

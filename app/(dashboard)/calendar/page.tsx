@@ -4,12 +4,9 @@ import { Button } from "@/components/ui/button";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { DayDetailPanel } from "@/components/calendar/DayDetailPanel";
 import { customerName } from "@/lib/utils";
+import { localDayKey } from "@/components/calendar/eventStyles";
 import { Plus, List } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
-
-function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function parseMonthParam(month?: string): Date {
   if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -43,7 +40,7 @@ export default async function CalendarPage({
 
   const eventsByDay: Record<string, CalendarEvent[]> = {};
   for (const event of (events ?? []) as CalendarEvent[]) {
-    const key = dayKey(new Date(event.start_time));
+    const key = localDayKey(event.start_time);
     (eventsByDay[key] ??= []).push(event);
   }
 

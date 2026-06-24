@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime } from "@/components/calendar/eventStyles";
+import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime, localDayKey } from "@/components/calendar/eventStyles";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
@@ -27,8 +27,7 @@ export function MonthCalendar({
   const month = monthDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
-  const today = new Date();
-  const todayKey = dayKey(today);
+  const todayKey = localDayKey(new Date().toISOString());
 
   const prevMonth = new Date(year, month - 1, 1);
   const nextMonth = new Date(year, month + 1, 1);
