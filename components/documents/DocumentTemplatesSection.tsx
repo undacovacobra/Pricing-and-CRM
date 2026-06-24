@@ -99,7 +99,7 @@ export function DocumentTemplatesSection({ templates }: { templates: DocumentTem
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">File (PDF, Word, etc.)</Label>
-          <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg" className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200" />
+          <input ref={fileRef} type="file" className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200" />
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

@@ -181,7 +181,6 @@ export function MaterialOrdersSection({ jobId, orders }: { jobId: string; orders
               <input
                 ref={newReceiptRef}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
                 onChange={(e) => setNewReceiptName(e.target.files?.[0]?.name ?? "")}
                 className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200"
               />

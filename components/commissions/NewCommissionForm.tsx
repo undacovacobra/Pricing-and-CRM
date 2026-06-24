@@ -124,7 +124,6 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
             className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-white file:text-xs file:font-medium hover:file:bg-slate-100"
           />
         </div>

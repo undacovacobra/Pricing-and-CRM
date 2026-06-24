@@ -133,7 +133,6 @@ export function JobAttachmentsSection({ jobId, attachments, googleReady }: { job
           ref={fileRef}
           type="file"
           multiple
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
           className="block flex-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200"
         />
         <Button size="sm" onClick={handleUpload} disabled={uploading}>

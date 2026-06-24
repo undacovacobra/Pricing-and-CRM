@@ -122,7 +122,6 @@ export function ContractDocsSection({ jobId, kind, items }: Props) {
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
               onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
               className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-xs file:font-medium hover:file:bg-slate-200"
             />
