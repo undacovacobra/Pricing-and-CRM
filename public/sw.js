@@ -1,9 +1,25 @@
 // Service worker for the Coastal Edge PWA: installability, push notifications,
 // and offline support (app shell + visited pages cached so the app — and the
 // job drawing tool in particular — works in the field with no signal).
-// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v3
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v4
 
-const CACHE = "coastal-edge-v3";
+const CACHE = "coastal-edge-v4";
+
+// The core app screens, pre-fetched the moment this worker installs so a
+// device has *something* cached immediately — not just whatever pages a user
+// happened to click through to before going offline.
+const PRECACHE_URLS = [
+  "/",
+  "/jobs",
+  "/customers",
+  "/calendar",
+  "/calendar/agenda",
+  "/commissions",
+  "/pricing",
+  "/documents",
+  "/estimates",
+  "/settings",
+];
 
 // Same-origin static assets we serve cache-first (immutable, hashed, or rarely
 // changing). Everything else falls under the runtime strategies below.
@@ -18,7 +34,21 @@ function isStaticAsset(url) {
   );
 }
 
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      // Best-effort: fetch each individually (not cache.addAll) so one failed
+      // route — e.g. a redirect to /login when logged out — doesn't abort the
+      // rest. credentials: "include" so the auth cookie rides along.
+      await Promise.allSettled(
+        PRECACHE_URLS.map(async (url) => {
+          const res = await fetch(url, { credentials: "include" });
+          if (res && res.ok) await cache.put(url, res);
+        }),
+      );
+    })(),
+  );
   self.skipWaiting();
 });
 
