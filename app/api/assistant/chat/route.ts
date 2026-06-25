@@ -7,7 +7,10 @@ import { APP_TIME_ZONE } from "@/components/calendar/eventStyles";
 
 export const maxDuration = 120;
 
-const MODEL = "gemini-2.5-flash";
+// flash-lite has a far higher free-tier daily request quota than flash
+// (~1000/day vs ~20/day), which matters because every tool-using turn is a
+// separate request. Plenty capable for lookups, reminders, and notes.
+const MODEL = "gemini-2.5-flash-lite";
 const MAX_TURNS = 8; // safety cap on the tool-use loop
 
 // Gemini conversation shapes (subset we use).
@@ -146,6 +149,19 @@ export async function POST(request: NextRequest) {
       messages: contents,
     });
   } catch (e) {
-    return NextResponse.json({ error: "assistant_failed", detail: String(e) }, { status: 502 });
+    const msg = String(e);
+    // Free-tier quota exhausted — show a calm, human message (200 so the widget
+    // renders it as a normal reply and the voice mode reads it out) rather than
+    // a raw API error dump.
+    if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
+      const m = msg.match(/retry in ([\d.]+)s/i) || msg.match(/"retryDelay":"(\d+)s"/);
+      const secs = m ? Math.ceil(Number(m[1])) : null;
+      const when = secs && secs > 90 ? "in a little while" : secs ? `in about ${secs} seconds` : "in a bit";
+      return NextResponse.json({
+        reply: `I've hit the free usage limit for the moment — please try again ${when}.`,
+        messages: contents,
+      });
+    }
+    return NextResponse.json({ error: "assistant_failed", detail: msg }, { status: 502 });
   }
 }
