@@ -1,27 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
-import { GEMINI_TOOL_DECLARATIONS, executeAssistantTool, type AssistantContext, type TeamRole, type StagedAttachment } from "@/lib/assistant/tools";
+import { OPENAI_TOOLS, executeAssistantTool, type AssistantContext, type TeamRole, type StagedAttachment } from "@/lib/assistant/tools";
 import { APP_TIME_ZONE } from "@/components/calendar/eventStyles";
 
 export const maxDuration = 120;
 
-// flash-lite has a far higher free-tier daily request quota than flash
-// (~1000/day vs ~20/day), which matters because every tool-using turn is a
-// separate request. Plenty capable for lookups, reminders, and notes.
-const MODEL = "gemini-2.5-flash-lite";
+// Groq's OpenAI-compatible endpoint. llama-3.3-70b-versatile supports tool use
+// and has a far more generous (and reliable) free tier than Gemini's free tier.
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "llama-3.3-70b-versatile";
 const MAX_TURNS = 8; // safety cap on the tool-use loop
 
-// Gemini conversation shapes (subset we use).
-interface Part {
-  text?: string;
-  functionCall?: { name: string; args?: Record<string, unknown> };
-  functionResponse?: { name: string; response: Record<string, unknown> };
+// OpenAI/Groq chat message shapes (subset we use).
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
 }
-interface Content {
-  role: string; // "user" | "model"
-  parts: Part[];
+interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 function systemPrompt(ctx: AssistantContext): string {
@@ -57,20 +59,24 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({
-      reply: "The assistant isn't turned on yet — a free GEMINI_API_KEY needs to be added to the app's environment variables (get one at aistudio.google.com). Once it's set I'll be able to help.",
+      reply: "The assistant isn't turned on yet — a free GROQ_API_KEY needs to be added to the app's environment variables (get one at console.groq.com). Once it's set I'll be able to help.",
       messages: [],
       notConfigured: true,
     });
   }
 
-  let history: Content[] = [];
+  let history: ChatMessage[] = [];
   let message = "";
   let attachments: StagedAttachment[] = [];
   try {
     const body = await request.json();
-    if (Array.isArray(body.messages)) history = body.messages;
+    // Keep only the conversational turns; the system prompt is re-added fresh
+    // each request (so "current time" stays correct and old shapes can't leak).
+    if (Array.isArray(body.messages)) {
+      history = (body.messages as ChatMessage[]).filter((m) => m && m.role && m.role !== "system");
+    }
     message = String(body.message ?? "").trim();
     if (Array.isArray(body.attachments)) {
       attachments = body.attachments
@@ -96,97 +102,95 @@ export async function POST(request: NextRequest) {
     ? `${message || "(no message)"}\n\n[Attached file(s) ready to file into a job: ${attachments.map((a) => a.file_name).join(", ")}]`
     : message;
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const contents: Content[] = [...history, { role: "user", parts: [{ text: userText }] }];
+  // System prompt is prepended for the API call but NOT returned to the client.
+  const convo: ChatMessage[] = [...history, { role: "user", content: userText }];
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // The model occasionally returns a transient 503 ("high demand"). Retry a few
-  // times with growing backoff so these blips recover without bothering the user.
-  async function generateWithRetry() {
-    let lastErr: unknown;
+  // Call Groq, retrying transient 5xx/overload responses with backoff.
+  async function callGroq(messages: ChatMessage[]): Promise<ChatMessage> {
+    let lastDetail = "";
     for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        return await ai.models.generateContent({
+      const res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
           model: MODEL,
-          contents,
-          config: {
-            systemInstruction: systemPrompt(ctx),
-            tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as unknown as FunctionDeclaration[] }],
-          },
-        });
-      } catch (err) {
-        lastErr = err;
-        const m = String(err);
-        const transient = m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded");
-        if (!transient || attempt === 2) throw err;
-        await sleep(800 * (attempt + 1)); // 0.8s, then 1.6s
+          messages: [{ role: "system", content: systemPrompt(ctx) }, ...messages],
+          tools: OPENAI_TOOLS,
+          tool_choice: "auto",
+          temperature: 0.3,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const msg = data.choices?.[0]?.message as ChatMessage | undefined;
+        if (!msg) throw new Error("no_choice");
+        return msg;
       }
+
+      lastDetail = await res.text().catch(() => "");
+      // 429 = rate limited (give up immediately, it won't clear in-request);
+      // 5xx = transient, retry with backoff.
+      if (res.status === 429) throw new Error(`RATE_LIMIT:${lastDetail}`);
+      if (res.status >= 500 && attempt < 2) {
+        await sleep(800 * (attempt + 1));
+        continue;
+      }
+      throw new Error(`GROQ_${res.status}:${lastDetail}`);
     }
-    throw lastErr;
+    throw new Error(`GROQ_RETRY_EXHAUSTED:${lastDetail}`);
   }
 
   try {
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await generateWithRetry();
+      const msg = await callGroq(convo);
+      convo.push(msg);
 
-      const modelContent: Content = (response.candidates?.[0]?.content as Content) ?? { role: "model", parts: [] };
-      contents.push(modelContent);
-
-      const calls = (modelContent.parts ?? [])
-        .map((p) => p.functionCall)
-        .filter((c): c is { name: string; args?: Record<string, unknown> } => !!c);
-
+      const calls = msg.tool_calls ?? [];
       if (calls.length === 0) {
-        const reply =
-          (modelContent.parts ?? [])
-            .map((p) => p.text)
-            .filter(Boolean)
-            .join("\n")
-            .trim() ||
-          response.text ||
-          "I didn't catch that — could you rephrase?";
-        return NextResponse.json({ reply, messages: contents });
+        const reply = (msg.content ?? "").trim() || "I didn't catch that — could you rephrase?";
+        return NextResponse.json({ reply, messages: convo });
       }
 
-      // Execute each tool; Gemini expects results back in a user-role turn
-      // carrying functionResponse parts.
-      const respParts: Part[] = [];
+      // Execute each requested tool and feed results back as tool messages.
       for (const call of calls) {
+        let input: Record<string, unknown> = {};
+        try {
+          input = call.function.arguments ? JSON.parse(call.function.arguments) : {};
+        } catch {
+          input = {};
+        }
         let out: string;
         try {
-          out = await executeAssistantTool(supabase, call.name, (call.args ?? {}) as Record<string, unknown>, ctx);
+          out = await executeAssistantTool(supabase, call.function.name, input, ctx);
         } catch (e) {
           out = `Tool error: ${String(e)}`;
         }
-        respParts.push({ functionResponse: { name: call.name, response: { result: out } } });
+        convo.push({ role: "tool", tool_call_id: call.id, name: call.function.name, content: out });
       }
-      contents.push({ role: "user", parts: respParts });
     }
 
     return NextResponse.json({
       reply: "Sorry — that took more steps than I expected. Could you rephrase or break it into smaller asks?",
-      messages: contents,
+      messages: convo,
     });
   } catch (e) {
     const msg = String(e);
-    // Free-tier quota exhausted — show a calm, human message (200 so the widget
-    // renders it as a normal reply and the voice mode reads it out) rather than
-    // a raw API error dump.
-    if (msg.includes("RESOURCE_EXHAUSTED") || msg.includes("429")) {
-      const m = msg.match(/retry in ([\d.]+)s/i) || msg.match(/"retryDelay":"(\d+)s"/);
-      const secs = m ? Math.ceil(Number(m[1])) : null;
-      const when = secs && secs > 90 ? "in a little while" : secs ? `in about ${secs} seconds` : "in a bit";
+    if (msg.startsWith("Error: RATE_LIMIT") || msg.includes("RATE_LIMIT")) {
       return NextResponse.json({
-        reply: `I've hit the free usage limit for the moment — please try again ${when}.`,
-        messages: contents,
+        reply: "I've hit the usage limit for the moment — please try again in a little bit.",
+        messages: convo,
       });
     }
-    // Transient overload that survived the retries above.
-    if (msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("overloaded")) {
+    if (msg.includes("GROQ_5") || msg.includes("RETRY_EXHAUSTED") || msg.includes("overloaded")) {
       return NextResponse.json({
-        reply: "The AI service is briefly overloaded right now. Give it a few seconds and try again.",
-        messages: contents,
+        reply: "The AI service is briefly unavailable. Give it a few seconds and try again.",
+        messages: convo,
       });
     }
     return NextResponse.json({ error: "assistant_failed", detail: msg }, { status: 502 });

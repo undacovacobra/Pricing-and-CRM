@@ -453,6 +453,21 @@ export const GEMINI_TOOL_DECLARATIONS = ASSISTANT_TOOLS.map((t) => ({
   parameters: toGeminiSchema(t.input_schema),
 }));
 
+// ---- OpenAI-compatible tools (Groq) ----------------------------------------
+
+// Groq speaks the OpenAI Chat Completions dialect: tools are wrapped in
+// { type: "function", function: { name, description, parameters } } and the
+// parameters are plain JSON Schema — which is exactly what input_schema already
+// is, so no type-name conversion is needed here.
+export const OPENAI_TOOLS = ASSISTANT_TOOLS.map((t) => ({
+  type: "function" as const,
+  function: {
+    name: t.name,
+    description: t.description,
+    parameters: t.input_schema,
+  },
+}));
+
 type Json = Record<string, unknown>;
 
 export async function executeAssistantTool(
