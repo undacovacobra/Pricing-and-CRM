@@ -67,7 +67,10 @@ export function PaymentTracker(props: Props) {
   function togglePaid(key: "deposit" | "delivery" | "completion") {
     const next = !paid[key];
     setPaid((p) => ({ ...p, [key]: next }));
-    persist({ [`pay_${key}_paid`]: next });
+    persist({
+      [`pay_${key}_paid`]:    next,
+      [`pay_${key}_paid_at`]: next ? new Date().toISOString() : null,
+    });
   }
 
   function commitCustom(key: "deposit" | "delivery" | "completion", raw: string) {
@@ -88,7 +91,10 @@ export function PaymentTracker(props: Props) {
   function toggleCoPaid() {
     const next = !coPaid;
     setCoPaid(next);
-    persist({ change_orders_paid: next });
+    persist({
+      change_orders_paid:    next,
+      change_orders_paid_at: next ? new Date().toISOString() : null,
+    });
   }
 
   return (

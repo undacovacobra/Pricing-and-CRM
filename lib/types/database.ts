@@ -122,11 +122,15 @@ export interface Job {
   retainer_amount: number | null;
   pay_deposit_paid: boolean;
   pay_deposit_amount: number | null;
+  pay_deposit_paid_at: string | null;
   pay_delivery_paid: boolean;
   pay_delivery_amount: number | null;
+  pay_delivery_paid_at: string | null;
   pay_completion_paid: boolean;
   pay_completion_amount: number | null;
+  pay_completion_paid_at: string | null;
   change_orders_paid: boolean;
+  change_orders_paid_at: string | null;
   created_at: string;
   updated_at: string;
 }
