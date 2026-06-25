@@ -1,18 +1,49 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { putDrawing, getDrawing } from "@/lib/offline/db";
 import type { JobDrawing } from "@/lib/types/database";
+
+// Cache a drawing for offline use, but never clobber unsynced local edits.
+async function getCachedAndStore(d: JobDrawing, jobId: string) {
+  const local = await getDrawing(d.id);
+  if (local?.pendingSync) return;
+  putDrawing({
+    id: d.id,
+    job_id: jobId,
+    label: d.label,
+    strokes: d.strokes ?? [],
+    thumbnail: d.thumbnail ?? null,
+    sort_order: d.sort_order ?? 0,
+    updated_at: d.updated_at ?? new Date().toISOString(),
+    pendingSync: false,
+  });
+}
 
 export function DrawingsList({ jobId, drawings }: { jobId: string; drawings: JobDrawing[] }) {
   const router = useRouter();
   const supabase = createClient();
   const [creating, setCreating] = useState(false);
 
+  // Cache each drawing locally so opened pages are editable offline later.
+  useEffect(() => {
+    for (const d of drawings) {
+      getCachedAndStore(d, jobId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawings]);
+
   async function addPage() {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      alert(
+        "You're offline. New drawing pages need a connection to set up — open the pages you'll need while you have signal, then you can keep drawing and saving on them offline.",
+      );
+      return;
+    }
     setCreating(true);
     const nextLabel = `Page ${drawings.length + 1}`;
     const { data } = await supabase

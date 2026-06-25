@@ -1,14 +1,104 @@
-// Service worker for the Coastal Edge PWA: enables install + push notifications.
-// Kept intentionally minimal — no offline caching of app data (the app needs a
-// live Supabase connection), just what's required for installability and push.
-// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v2
+// Service worker for the Coastal Edge PWA: installability, push notifications,
+// and offline support (app shell + visited pages cached so the app — and the
+// job drawing tool in particular — works in the field with no signal).
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v3
+
+const CACHE = "coastal-edge-v3";
+
+// Same-origin static assets we serve cache-first (immutable, hashed, or rarely
+// changing). Everything else falls under the runtime strategies below.
+function isStaticAsset(url) {
+  return (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/fonts/") ||
+    url.pathname.startsWith("/icon-") ||
+    url.pathname === "/manifest.webmanifest" ||
+    url.pathname === "/logo.svg" ||
+    /\.(?:png|jpg|jpeg|svg|webp|woff2?|ttf)$/.test(url.pathname)
+  );
+}
 
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      // Drop caches from older versions.
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) {
+    // Refresh in the background; don't block the response.
+    fetch(request)
+      .then((res) => {
+        if (res && res.ok) caches.open(CACHE).then((c) => c.put(request, res.clone()));
+      })
+      .catch(() => {});
+    return cached;
+  }
+  const res = await fetch(request);
+  if (res && res.ok) {
+    const clone = res.clone();
+    caches.open(CACHE).then((c) => c.put(request, clone));
+  }
+  return res;
+}
+
+async function networkFirst(request, fallbackToShell) {
+  try {
+    const res = await fetch(request);
+    if (res && res.ok) {
+      const clone = res.clone();
+      caches.open(CACHE).then((c) => c.put(request, clone));
+    }
+    return res;
+  } catch (err) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    if (fallbackToShell) {
+      // Last resort for a navigation we've never cached: hand back any cached
+      // app page so the client router/IndexedDB can take over offline.
+      const anyPage =
+        (await caches.match("/")) ||
+        (await caches.match("/jobs")) ||
+        (await caches.match("/calendar"));
+      if (anyPage) return anyPage;
+    }
+    throw err;
+  }
+}
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return; // never cache mutations
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return; // let Supabase/Google hit network
+  if (url.pathname.startsWith("/api/")) return; // dynamic; needs the network
+
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirst(request));
+    return;
+  }
+
+  // Page navigations and Next's RSC fetches: fresh when online, cached offline.
+  const isNavigation = request.mode === "navigate";
+  const isRsc = url.searchParams.has("_rsc") || request.headers.get("RSC") === "1";
+  if (isNavigation || isRsc) {
+    event.respondWith(networkFirst(request, isNavigation));
+    return;
+  }
+
+  // Other same-origin GETs: network-first with cache fallback.
+  event.respondWith(networkFirst(request, false));
 });
 
 // Incoming web push → show a notification, even when the app is fully closed.

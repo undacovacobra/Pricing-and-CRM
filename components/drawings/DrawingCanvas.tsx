@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { triggerBackup } from "@/lib/backup/trigger";
+import { putDrawing, getDrawing } from "@/lib/offline/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Undo2, ZoomIn, ZoomOut, RotateCcw, Trash2, Save, Hand, Pencil as PencilIcon, Eraser } from "lucide-react";
@@ -89,6 +90,38 @@ export function DrawingCanvas({ jobId, drawing }: { jobId: string; drawing: JobD
   useEffect(() => {
     redraw();
   }, [redraw]);
+
+  // On open, prefer an unsynced local copy (edits made offline survive reloads);
+  // otherwise cache the server copy so this page is editable offline later.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const local = await getDrawing(drawing.id);
+      if (cancelled) return;
+      if (local?.pendingSync) {
+        strokesRef.current = (local.strokes as DrawingStroke[]) ?? [];
+        setLabel(local.label);
+        setCanUndo(strokesRef.current.length > 0);
+        setDirty(true);
+        redraw();
+      } else {
+        putDrawing({
+          id: drawing.id,
+          job_id: jobId,
+          label: drawing.label,
+          strokes: drawing.strokes ?? [],
+          thumbnail: drawing.thumbnail ?? null,
+          sort_order: drawing.sort_order ?? 0,
+          updated_at: drawing.updated_at ?? new Date().toISOString(),
+          pendingSync: false,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     function resize() {
@@ -254,16 +287,46 @@ export function DrawingCanvas({ jobId, drawing }: { jobId: string; drawing: JobD
       tctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, thumbCanvas.width, thumbCanvas.height);
     }
     const thumbnail = thumbCanvas.toDataURL("image/png");
+    const now = new Date().toISOString();
 
-    await supabase
-      .from("job_drawings")
-      .update({ label, strokes: strokesRef.current, thumbnail })
-      .eq("id", drawing.id);
+    // Always persist locally first so a save never loses work, online or not.
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
+    await putDrawing({
+      id: drawing.id,
+      job_id: jobId,
+      label,
+      strokes: strokesRef.current,
+      thumbnail,
+      sort_order: drawing.sort_order ?? 0,
+      updated_at: now,
+      pendingSync: !online,
+    });
 
-    triggerBackup({ jobId });
+    if (online) {
+      const { error } = await supabase
+        .from("job_drawings")
+        .update({ label, strokes: strokesRef.current, thumbnail })
+        .eq("id", drawing.id);
+      if (error) {
+        // Network blip — keep it queued for the sync engine.
+        await putDrawing({
+          id: drawing.id,
+          job_id: jobId,
+          label,
+          strokes: strokesRef.current,
+          thumbnail,
+          sort_order: drawing.sort_order ?? 0,
+          updated_at: now,
+          pendingSync: true,
+        });
+      } else {
+        triggerBackup({ jobId });
+        router.refresh();
+      }
+    }
+
     setDirty(false);
     setSaving(false);
-    router.refresh();
   }
 
   return (
