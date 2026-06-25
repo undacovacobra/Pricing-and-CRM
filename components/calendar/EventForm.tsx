@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TimeSelect } from "@/components/ui/time-select";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomerCombobox } from "@/components/calendar/CustomerCombobox";
 import { triggerBackup } from "@/lib/backup/trigger";
@@ -95,9 +96,10 @@ export function EventForm({
     initialLocationMode === "other" ? event?.location ?? "" : "",
   );
   const defaultDate = searchParams.get("date");
-  const [startTime, setStartTime] = useState(
-    event?.start_time ? toLocalInput(event.start_time) : defaultDate ? `${defaultDate}T09:00` : "",
-  );
+  const initialStart = event?.start_time ? toLocalInput(event.start_time) : defaultDate ? `${defaultDate}T09:00` : "";
+  const [startDate, setStartDate] = useState(initialStart.split("T")[0] ?? "");
+  const [startTimeOfDay, setStartTimeOfDay] = useState(initialStart.split("T")[1] ?? "09:00");
+  const startTime = startDate ? `${startDate}T${startTimeOfDay || "09:00"}` : "";
   const isMultiDay = Boolean(event?.end_time && toDateOnly(event.start_time) !== toDateOnly(event.end_time));
   const [multiDay, setMultiDay] = useState(isMultiDay);
   const [endDate, setEndDate] = useState(
@@ -328,12 +330,26 @@ export function EventForm({
           <div className="space-y-1.5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="start_time">Date *</Label>
-                <Input id="start_time" type="datetime-local" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Label htmlFor="start_date">Date *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1"
+                  />
+                  <TimeSelect
+                    id="start_time_of_day"
+                    value={startTimeOfDay}
+                    onChange={setStartTimeOfDay}
+                    className="w-32 rounded-md border px-2 py-2 text-sm"
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="end_time_only">Ends</Label>
-                <Input id="end_time_only" type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <TimeSelect id="end_time_only" value={endTime} onChange={setEndTime} allowEmpty />
               </div>
             </div>
             <label className="flex items-center gap-2 pt-1">

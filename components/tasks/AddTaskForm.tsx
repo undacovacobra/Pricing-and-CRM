@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createTask } from "@/app/(dashboard)/tasks/actions";
+import { TimeSelect } from "@/components/ui/time-select";
 
 // Compact add-task form, reused on the Tasks page, the calendar page, and inside
 // a job. When jobId is set the task is linked to that job (and the job picker is
@@ -83,12 +84,11 @@ export function AddTaskForm({
         </label>
         <label className="text-xs text-slate-500">
           Time
-          <input
-            type="time"
-            step={900}
+          <TimeSelect
             value={dueTime}
-            onChange={(e) => setDueTime(e.target.value)}
+            onChange={setDueTime}
             disabled={!dueDate}
+            allowEmpty
             className="ml-1 rounded-md border px-2 py-1 text-sm disabled:opacity-50"
           />
         </label>
