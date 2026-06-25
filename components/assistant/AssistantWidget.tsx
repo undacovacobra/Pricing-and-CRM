@@ -136,15 +136,20 @@ export function AssistantWidget() {
     }
   }
 
-  // Every voice turn always speaks the reply out loud — whether it's a single
-  // tap-to-ask from the composer, or one leg of a hands-free conversation. It
-  // only keeps listening for the next turn when hands-free mode is on.
+  // One leg of a spoken conversation: heard speech -> send -> speak the reply
+  // -> go back to listening so the user can answer. Loops until voice mode is
+  // turned off. The small delay after speaking gives the browser time to
+  // release the audio output before we reopen the mic (important on mobile,
+  // where starting recognition too soon after TTS silently fails).
   const handleVoiceTurn = useCallback(
     async (text: string) => {
       const reply = await send(text);
-      if (reply) {
+      if (reply && voiceModeRef.current) {
         voice.speak(reply, () => {
-          if (voiceModeRef.current) voice.startListening(handleVoiceTurn);
+          if (!voiceModeRef.current) return;
+          setTimeout(() => {
+            if (voiceModeRef.current) voice.startListening(handleVoiceTurn);
+          }, 350);
         });
       }
     },
@@ -153,26 +158,22 @@ export function AssistantWidget() {
     [],
   );
 
-  function toggleVoiceMode() {
-    const next = !voiceMode;
-    setVoiceMode(next);
-    voiceModeRef.current = next;
-    if (next) {
-      voice.startListening(handleVoiceTurn);
-    } else {
-      voice.stopListening();
-      voice.stopSpeaking();
-    }
+  function startConversation() {
+    setVoiceMode(true);
+    voiceModeRef.current = true;
+    voice.startListening(handleVoiceTurn);
   }
 
-  // Tap-to-ask: speak one question, hear one spoken answer back. No typing
-  // involved — meant for when your hands are full.
-  function askByVoice() {
-    if (voice.listening) {
-      voice.stopListening();
-      return;
-    }
-    voice.startListening(handleVoiceTurn);
+  function stopConversation() {
+    setVoiceMode(false);
+    voiceModeRef.current = false;
+    voice.stopListening();
+    voice.stopSpeaking();
+  }
+
+  function toggleVoiceMode() {
+    if (voiceMode) stopConversation();
+    else startConversation();
   }
 
   // Turning the panel off stops any audio in flight.
@@ -184,6 +185,19 @@ export function AssistantWidget() {
       voice.stopSpeaking();
     }
   }, [open, voice]);
+
+  // After it finishes speaking (or the mic times out with nothing heard), the
+  // loop normally reopens the mic. If for some reason it stalls in voice mode
+  // while idle, reopen it so the user is never stuck unable to reply.
+  useEffect(() => {
+    if (!voiceMode || voice.listening || voice.speaking || sending) return;
+    const t = setTimeout(() => {
+      if (voiceModeRef.current && !voice.listening && !voice.speaking) {
+        voice.startListening(handleVoiceTurn);
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [voiceMode, voice.listening, voice.speaking, sending, voice, handleVoiceTurn]);
 
   return (
     <>
@@ -251,13 +265,23 @@ export function AssistantWidget() {
                   </>
                 )}
               </div>
-              {voiceMode && !voice.listening && !voice.speaking && !sending && (
-                <button
-                  onClick={() => voice.startListening(handleVoiceTurn)}
-                  className="text-xs font-semibold rounded-full bg-emerald-600 text-white px-3 py-1 hover:bg-emerald-700"
-                >
-                  Tap to talk
-                </button>
+              {voiceMode && (
+                <div className="flex items-center gap-2">
+                  {!voice.listening && !voice.speaking && !sending && (
+                    <button
+                      onClick={() => voice.startListening(handleVoiceTurn)}
+                      className="text-xs font-semibold rounded-full bg-emerald-600 text-white px-3 py-1 hover:bg-emerald-700"
+                    >
+                      Tap to talk
+                    </button>
+                  )}
+                  <button
+                    onClick={stopConversation}
+                    className="text-xs font-semibold rounded-full bg-white text-emerald-700 border border-emerald-300 px-3 py-1 hover:bg-emerald-100"
+                  >
+                    Stop
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -352,14 +376,12 @@ export function AssistantWidget() {
               )}
               {voice.supported && !voiceMode && (
                 <button
-                  onClick={askByVoice}
-                  aria-label={voice.listening ? "Stop" : "Ask out loud and hear the answer"}
-                  title="Tap, ask your question out loud, and I'll answer out loud"
-                  className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center hover:bg-slate-50 ${
-                    voice.listening ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "text-slate-600"
-                  }`}
+                  onClick={startConversation}
+                  aria-label="Start talking — hands-free conversation"
+                  title="Tap, then just talk — I'll answer out loud and keep listening"
+                  className="h-9 w-9 shrink-0 rounded-lg border text-slate-600 flex items-center justify-center hover:bg-slate-50"
                 >
-                  <Mic className={`h-4 w-4 ${voice.listening ? "animate-pulse" : ""}`} />
+                  <Mic className="h-4 w-4" />
                 </button>
               )}
               <textarea
