@@ -1,9 +1,10 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, X, Send, Loader2, Paperclip, HardDrive } from "lucide-react";
+import { Sparkles, X, Send, Loader2, Paperclip, HardDrive, Mic, MicOff, Volume2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { openDrivePicker, pickerConfigured } from "@/lib/google/picker";
+import { useVoice } from "@/lib/voice/useVoice";
 
 // The full conversation (including tool-call turns) is held opaquely and
 // round-tripped to the server; the widget never constructs provider-specific
@@ -28,11 +29,14 @@ export function AssistantWidget() {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const convo = useRef<unknown[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const voiceModeRef = useRef(false);
   const supabase = createClient();
+  const voice = useVoice();
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -94,9 +98,9 @@ export function AssistantWidget() {
     }
   }
 
-  async function send(text: string) {
+  async function send(text: string): Promise<string | null> {
     const trimmed = text.trim();
-    if ((!trimmed && staged.length === 0) || sending) return;
+    if ((!trimmed && staged.length === 0) || sending) return null;
     setInput("");
     const sentFiles = staged;
     setStaged([]);
@@ -113,19 +117,74 @@ export function AssistantWidget() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setBubbles((b) => [...b, { role: "assistant", text: data.detail || data.error || "Something went wrong. Try again." }]);
-      } else {
-        if (Array.isArray(data.messages) && data.messages.length) convo.current = data.messages;
-        setBubbles((b) => [...b, { role: "assistant", text: data.reply || "(no response)" }]);
-        // An action may have changed data on the current page — refresh it.
-        router.refresh();
+        const err = data.detail || data.error || "Something went wrong. Try again.";
+        setBubbles((b) => [...b, { role: "assistant", text: err }]);
+        return err;
       }
+      if (Array.isArray(data.messages) && data.messages.length) convo.current = data.messages;
+      const reply = data.reply || "(no response)";
+      setBubbles((b) => [...b, { role: "assistant", text: reply }]);
+      // An action may have changed data on the current page — refresh it.
+      router.refresh();
+      return reply;
     } catch (e) {
-      setBubbles((b) => [...b, { role: "assistant", text: `Couldn't reach the assistant: ${String(e)}` }]);
+      const err = `Couldn't reach the assistant: ${String(e)}`;
+      setBubbles((b) => [...b, { role: "assistant", text: err }]);
+      return err;
     } finally {
       setSending(false);
     }
   }
+
+  // Hands-free conversation: heard speech -> send -> speak the reply -> listen
+  // again, looping until the user turns voice mode off.
+  const handleVoiceTurn = useCallback(
+    async (text: string) => {
+      const reply = await send(text);
+      if (reply && voiceModeRef.current) {
+        voice.speak(reply, () => {
+          if (voiceModeRef.current) voice.startListening(handleVoiceTurn);
+        });
+      }
+    },
+    // send/voice are stable enough for this widget's lifetime; ref guards re-entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  function toggleVoiceMode() {
+    const next = !voiceMode;
+    setVoiceMode(next);
+    voiceModeRef.current = next;
+    if (next) {
+      voice.startListening(handleVoiceTurn);
+    } else {
+      voice.stopListening();
+      voice.stopSpeaking();
+    }
+  }
+
+  // One-shot dictation: drop spoken words into the text box for review.
+  function dictate() {
+    if (voice.listening) {
+      voice.stopListening();
+      return;
+    }
+    voice.startListening((text) => {
+      setInput((prev) => (prev ? `${prev} ${text}` : text));
+      inputRef.current?.focus();
+    });
+  }
+
+  // Turning the panel off stops any audio in flight.
+  useEffect(() => {
+    if (!open && voiceModeRef.current) {
+      voiceModeRef.current = false;
+      setVoiceMode(false);
+      voice.stopListening();
+      voice.stopSpeaking();
+    }
+  }, [open, voice]);
 
   return (
     <>
@@ -149,10 +208,59 @@ export function AssistantWidget() {
               <Sparkles className="h-5 w-5" />
               <span className="font-semibold text-sm">Assistant</span>
             </div>
-            <button onClick={() => setOpen(false)} aria-label="Close assistant" className="p-1 rounded hover:bg-white/10">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {voice.supported && (
+                <button
+                  onClick={toggleVoiceMode}
+                  aria-label={voiceMode ? "Turn off voice conversation" : "Start voice conversation"}
+                  title={voiceMode ? "Turn off voice conversation" : "Talk back and forth"}
+                  className={`p-1.5 rounded transition-colors ${voiceMode ? "bg-emerald-500 text-white" : "hover:bg-white/10"}`}
+                >
+                  {voiceMode ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                </button>
+              )}
+              <button onClick={() => setOpen(false)} aria-label="Close assistant" className="p-1 rounded hover:bg-white/10">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
+
+          {/* Voice conversation status */}
+          {voiceMode && (
+            <div className="flex items-center justify-between gap-2 px-4 py-2 bg-emerald-50 border-b border-emerald-100 text-emerald-800">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                {voice.speaking ? (
+                  <>
+                    <Volume2 className="h-4 w-4 animate-pulse" /> Speaking…
+                  </>
+                ) : sending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+                  </>
+                ) : voice.listening ? (
+                  <>
+                    <span className="relative flex h-3 w-3">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                    </span>
+                    Listening…
+                  </>
+                ) : (
+                  <>
+                    <Mic className="h-4 w-4" /> Voice on
+                  </>
+                )}
+              </div>
+              {!voice.listening && !voice.speaking && !sending && (
+                <button
+                  onClick={() => voice.startListening(handleVoiceTurn)}
+                  className="text-xs font-semibold rounded-full bg-emerald-600 text-white px-3 py-1 hover:bg-emerald-700"
+                >
+                  Tap to talk
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
@@ -232,6 +340,18 @@ export function AssistantWidget() {
                   className="h-9 w-9 shrink-0 rounded-lg border text-slate-600 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
                 >
                   <HardDrive className="h-4 w-4" />
+                </button>
+              )}
+              {voice.supported && !voiceMode && (
+                <button
+                  onClick={dictate}
+                  aria-label={voice.listening ? "Stop dictation" : "Dictate a message"}
+                  title="Tap to speak your message"
+                  className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center hover:bg-slate-50 ${
+                    voice.listening ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "text-slate-600"
+                  }`}
+                >
+                  <Mic className={`h-4 w-4 ${voice.listening ? "animate-pulse" : ""}`} />
                 </button>
               )}
               <textarea
