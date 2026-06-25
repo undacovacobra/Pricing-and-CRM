@@ -29,6 +29,8 @@ export function OfflineManager() {
   useEffect(() => {
     setOnline(navigator.onLine);
     refreshPending();
+    // Warm the offline workspace + its scripts into the cache while we can.
+    if (navigator.onLine) router.prefetch("/offline");
 
     function onOnline() {
       setOnline(true);
@@ -58,9 +60,14 @@ export function OfflineManager() {
   return (
     <div className="fixed z-50 bottom-36 right-4 md:bottom-24 md:right-6 max-w-[260px]">
       {!online && (
-        <div className="flex items-center gap-2 rounded-lg bg-amber-500 text-white text-xs font-medium px-3 py-2 shadow-lg mb-2">
-          <CloudOff className="h-4 w-4 shrink-0" />
-          <span>Offline — drawings save to this device and sync when you&apos;re back.</span>
+        <div className="rounded-lg bg-amber-500 text-white text-xs font-medium px-3 py-2 shadow-lg mb-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <span>You&apos;re offline. The main app needs a connection — use the offline workspace to draw and view cached jobs.</span>
+          </div>
+          <a href="/offline" className="block text-center rounded bg-white/20 hover:bg-white/30 px-2 py-1.5 font-semibold">
+            Open offline workspace →
+          </a>
         </div>
       )}
       {pending > 0 && (

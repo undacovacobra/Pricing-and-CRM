@@ -31,8 +31,11 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  // The offline workspace renders entirely from on-device data; allow it
+  // through so a prefetch caches the real page, not a login redirect.
+  const isPublic = isAuthPage || request.nextUrl.pathname.startsWith("/offline");
 
-  if (!user && !isAuthPage) {
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

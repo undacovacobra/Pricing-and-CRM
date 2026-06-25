@@ -1,25 +1,20 @@
 // Service worker for the Coastal Edge PWA: installability, push notifications,
-// and offline support (app shell + visited pages cached so the app — and the
-// job drawing tool in particular — works in the field with no signal).
-// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v4
+// and offline support.
+//
+// Offline strategy: the normal app pages are server-rendered and can't be
+// reliably re-rendered without a connection (doing so throws a client-side
+// exception), so we DON'T serve stale copies of them offline. Instead, any
+// navigation that fails offline falls back to /offline — a fully self-contained
+// workspace that runs entirely from on-device data (IndexedDB) and lets the
+// user open cached jobs, draw, and save. Static assets are cached so that page
+// (and its scripts) load with no signal.
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v5
 
-const CACHE = "coastal-edge-v4";
+const CACHE = "coastal-edge-v5";
 
-// The core app screens, pre-fetched the moment this worker installs so a
-// device has *something* cached immediately — not just whatever pages a user
-// happened to click through to before going offline.
-const PRECACHE_URLS = [
-  "/",
-  "/jobs",
-  "/customers",
-  "/calendar",
-  "/calendar/agenda",
-  "/commissions",
-  "/pricing",
-  "/documents",
-  "/estimates",
-  "/settings",
-];
+// The offline workspace shell, pre-fetched on install so it's available the
+// first time the device goes offline — no warm-up browsing required.
+const PRECACHE_URLS = ["/offline"];
 
 // Same-origin static assets we serve cache-first (immutable, hashed, or rarely
 // changing). Everything else falls under the runtime strategies below.
@@ -82,26 +77,15 @@ async function cacheFirst(request) {
   return res;
 }
 
-async function networkFirst(request, fallbackToShell) {
+// Always hit the network for app pages; if that fails (offline), hand back the
+// self-contained /offline workspace rather than a stale server page that would
+// crash on render.
+async function navigationHandler(request) {
   try {
-    const res = await fetch(request);
-    if (res && res.ok) {
-      const clone = res.clone();
-      caches.open(CACHE).then((c) => c.put(request, clone));
-    }
-    return res;
+    return await fetch(request);
   } catch (err) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    if (fallbackToShell) {
-      // Last resort for a navigation we've never cached: hand back any cached
-      // app page so the client router/IndexedDB can take over offline.
-      const anyPage =
-        (await caches.match("/")) ||
-        (await caches.match("/jobs")) ||
-        (await caches.match("/calendar"));
-      if (anyPage) return anyPage;
-    }
+    const offline = await caches.match("/offline");
+    if (offline) return offline;
     throw err;
   }
 }
@@ -119,16 +103,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Page navigations and Next's RSC fetches: fresh when online, cached offline.
-  const isNavigation = request.mode === "navigate";
-  const isRsc = url.searchParams.has("_rsc") || request.headers.get("RSC") === "1";
-  if (isNavigation || isRsc) {
-    event.respondWith(networkFirst(request, isNavigation));
+  // Full page loads: when offline, fall back to the offline workspace.
+  if (request.mode === "navigate") {
+    event.respondWith(navigationHandler(request));
     return;
   }
 
-  // Other same-origin GETs: network-first with cache fallback.
-  event.respondWith(networkFirst(request, false));
+  // Next's RSC client-transition fetches: try network, and if offline just let
+  // it fail (the offline workspace doesn't rely on them). Don't serve stale
+  // RSC — that's what produced the client-side exceptions.
+  const isRsc = url.searchParams.has("_rsc") || request.headers.get("RSC") === "1";
+  if (isRsc) return;
 });
 
 // Incoming web push → show a notification, even when the app is fully closed.

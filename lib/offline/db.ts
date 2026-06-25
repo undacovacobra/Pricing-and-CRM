@@ -108,6 +108,15 @@ export function getJobFiles(jobId: string): Promise<OfflineJobFiles | null> {
 
 // ---- Jobs (id → title) ------------------------------------------------------
 
+export interface OfflineJob {
+  id: string;
+  title: string;
+}
+
 export function putJob(id: string, title: string): Promise<unknown> {
   return tx("jobs", "readwrite", (s) => s.put({ id, title }));
+}
+
+export function getAllJobs(): Promise<OfflineJob[]> {
+  return tx<OfflineJob[]>("jobs", "readonly", (s) => s.getAll() as IDBRequest<OfflineJob[]>).then((r) => r ?? []);
 }

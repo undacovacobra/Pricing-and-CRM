@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DrawingsList } from "@/components/drawings/DrawingsList";
+import { CacheJobForOffline } from "@/components/offline/CacheJobForOffline";
 import type { JobDrawing } from "@/lib/types/database";
 
 export default async function JobDrawingsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,6 +20,11 @@ export default async function JobDrawingsPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
+      <CacheJobForOffline
+        jobId={job.id}
+        jobTitle={job.title}
+        files={(drawings ?? []).map((d) => ({ kind: "Drawing", name: d.label || "Untitled" }))}
+      />
       <div>
         <Link href={`/jobs/${id}`} className="text-sm text-muted-foreground hover:underline">
           ← {job.title}

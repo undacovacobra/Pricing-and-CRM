@@ -12,6 +12,7 @@ import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
 import { PaymentTracker } from "@/components/jobs/PaymentTracker";
 import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
+import { CacheJobForOffline } from "@/components/offline/CacheJobForOffline";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
@@ -78,8 +79,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const configured = googleConfigured();
   const googleReady = configured && (await getGoogleConnectionStatus()).connected;
 
+  const offlineFiles = [
+    ...(attachments ?? []).map((a) => ({ kind: "Attachment", name: a.file_name as string })),
+    ...(drawings ?? []).map((d) => ({ kind: "Drawing", name: (d.label as string) || "Untitled" })),
+    ...(photos ?? []).map((p) => ({ kind: "Photo", name: (p.caption as string) || "(photo)" })),
+    ...(contractDocs ?? []).map((c) => ({ kind: c.kind === "change_order" ? "Change order" : "Contract", name: (c.file_name as string) || (c.kind as string) })),
+    ...(documents ?? []).map((d) => ({ kind: "Document", name: `${d.document_type} ${d.document_number ?? ""}`.trim() })),
+  ];
+
   return (
     <div className="space-y-6">
+      <CacheJobForOffline jobId={job.id} jobTitle={job.title} files={offlineFiles} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="min-w-0">
