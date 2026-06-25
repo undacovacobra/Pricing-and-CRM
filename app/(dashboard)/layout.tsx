@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { AssistantWidget } from "@/components/assistant/AssistantWidget";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </main>
         <MobileNav />
+        <AssistantWidget />
       </div>
     </div>
   );
