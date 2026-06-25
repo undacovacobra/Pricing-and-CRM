@@ -3,10 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, X, Send, Loader2 } from "lucide-react";
 
-// Minimal shape of an Anthropic message — the full conversation (including tool
-// blocks) is held opaquely and round-tripped to the server; we only read text
-// for display.
-type ApiMessage = { role: "user" | "assistant"; content: unknown };
+// The full conversation (including tool-call turns) is held opaquely and
+// round-tripped to the server; the widget never constructs provider-specific
+// message shapes — it just stores what the server returns and resends it.
 type Bubble = { role: "user" | "assistant"; text: string };
 
 const SUGGESTIONS = [
@@ -21,7 +20,7 @@ export function AssistantWidget() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
-  const convo = useRef<ApiMessage[]>([]);
+  const convo = useRef<unknown[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,13 +37,12 @@ export function AssistantWidget() {
     if (!trimmed || sending) return;
     setInput("");
     setBubbles((b) => [...b, { role: "user", text: trimmed }]);
-    convo.current = [...convo.current, { role: "user", content: trimmed }];
     setSending(true);
     try {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: convo.current }),
+        body: JSON.stringify({ messages: convo.current, message: trimmed }),
       });
       const data = await res.json();
       if (!res.ok) {

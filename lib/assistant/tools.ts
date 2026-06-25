@@ -5,8 +5,22 @@
 // answer questions; action tools (create_appointment, add_job_note) make
 // changes. Executors return human-readable strings — the model reads them back.
 
-import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Provider-neutral JSON-schema-ish shape for a tool's parameters.
+interface ToolSchema {
+  type: string;
+  description?: string;
+  properties?: Record<string, ToolSchema>;
+  required?: string[];
+  items?: ToolSchema;
+  enum?: string[];
+}
+interface ToolDef {
+  name: string;
+  description: string;
+  input_schema: ToolSchema;
+}
 
 // "owner" = Travis, "designer" = Carol — the values stored in assigned_to / author.
 export type TeamRole = "owner" | "designer";
@@ -33,7 +47,7 @@ function resolveRole(value: string | null | undefined, ctx: AssistantContext): T
   return ctx.role;
 }
 
-export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
+export const ASSISTANT_TOOLS: ToolDef[] = [
   {
     name: "search_jobs",
     description:
@@ -122,6 +136,39 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     },
   },
 ];
+
+// ---- Gemini function declarations ------------------------------------------
+
+// Gemini's function-declaration schema is JSON-schema-like but wants uppercase
+// type names ("STRING", "OBJECT", …) and uses `parameters` rather than
+// `input_schema`. Convert our neutral definitions once.
+interface GeminiSchema {
+  type: string;
+  description?: string;
+  properties?: Record<string, GeminiSchema>;
+  required?: string[];
+  items?: GeminiSchema;
+  enum?: string[];
+}
+
+function toGeminiSchema(s: ToolSchema): GeminiSchema {
+  const out: GeminiSchema = { type: s.type.toUpperCase() };
+  if (s.description) out.description = s.description;
+  if (s.enum) out.enum = s.enum;
+  if (s.required) out.required = s.required;
+  if (s.items) out.items = toGeminiSchema(s.items);
+  if (s.properties) {
+    out.properties = {};
+    for (const [k, v] of Object.entries(s.properties)) out.properties[k] = toGeminiSchema(v);
+  }
+  return out;
+}
+
+export const GEMINI_TOOL_DECLARATIONS = ASSISTANT_TOOLS.map((t) => ({
+  name: t.name,
+  description: t.description,
+  parameters: toGeminiSchema(t.input_schema),
+}));
 
 type Json = Record<string, unknown>;
 
