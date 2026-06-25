@@ -141,6 +141,9 @@ export function useVoice() {
     } catch {
       /* ignore */
     }
+    // Mark speaking immediately — the engine can take a beat to actually start
+    // (especially on mobile), and we must not look "idle" during that gap.
+    setSpeaking(true);
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = "en-US";
     u.rate = 1.0;

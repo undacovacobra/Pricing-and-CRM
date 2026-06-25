@@ -143,8 +143,12 @@ export function AssistantWidget() {
   // where starting recognition too soon after TTS silently fails).
   const handleVoiceTurn = useCallback(
     async (text: string) => {
+      // Close the mic while we think and talk so it never hears its own voice.
+      voice.stopListening();
       const reply = await send(text);
       if (reply && voiceModeRef.current) {
+        // speak() resolves its callback only once the reply has finished
+        // playing — only then do we reopen the mic for the next turn.
         voice.speak(reply, () => {
           if (!voiceModeRef.current) return;
           setTimeout(() => {
@@ -186,18 +190,6 @@ export function AssistantWidget() {
     }
   }, [open, voice]);
 
-  // After it finishes speaking (or the mic times out with nothing heard), the
-  // loop normally reopens the mic. If for some reason it stalls in voice mode
-  // while idle, reopen it so the user is never stuck unable to reply.
-  useEffect(() => {
-    if (!voiceMode || voice.listening || voice.speaking || sending) return;
-    const t = setTimeout(() => {
-      if (voiceModeRef.current && !voice.listening && !voice.speaking) {
-        voice.startListening(handleVoiceTurn);
-      }
-    }, 600);
-    return () => clearTimeout(t);
-  }, [voiceMode, voice.listening, voice.speaking, sending, voice, handleVoiceTurn]);
 
   return (
     <>
