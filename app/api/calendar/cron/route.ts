@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient, adminConfigured } from "@/lib/supabase/admin";
 import { emailConfigured } from "@/lib/email/resend";
 import { runDueReminders, runDueStaffPush } from "@/lib/calendar/notify";
+import { runDueTaskReminders } from "@/lib/tasks/notify";
 
 export const runtime = "nodejs";
 
@@ -21,9 +22,11 @@ async function run(request: NextRequest) {
   try {
     // Phone push reminders for the team (1h before + at start) — independent of email config.
     const pushed = await runDueStaffPush(admin);
+    // Daily task reminders: nudge owners about open tasks due today/overdue.
+    const taskReminders = await runDueTaskReminders(admin);
     // Customer email reminders only run when Resend is configured.
     const sent = emailConfigured() ? await runDueReminders(admin) : 0;
-    return NextResponse.json({ ok: true, sent, pushed, emailSkipped: !emailConfigured() });
+    return NextResponse.json({ ok: true, sent, pushed, taskReminders, emailSkipped: !emailConfigured() });
   } catch (e) {
     return NextResponse.json({ error: "reminder_run_failed", detail: String(e) }, { status: 502 });
   }

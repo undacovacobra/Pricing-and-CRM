@@ -13,6 +13,9 @@ import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
 import { PaymentTracker } from "@/components/jobs/PaymentTracker";
 import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { CacheJobForOffline } from "@/components/offline/CacheJobForOffline";
+import { JobTasksSection } from "@/components/jobs/JobTasksSection";
+import { roleFromEmail } from "@/lib/tasks/shared";
+import type { TaskRow } from "@/components/tasks/TaskItem";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
@@ -67,6 +70,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from("calendar_events").select("*").eq("job_id", id).eq("status", "scheduled").order("start_time", { ascending: true }),
     supabase.from("job_drawings").select("*").eq("job_id", id).order("sort_order", { ascending: true }).limit(6),
   ]);
+
+  const [{ data: { user } }, { data: jobTasks }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("tasks")
+      .select("id, title, description, due_date, assigned_to, status, job_id")
+      .eq("job_id", id)
+      .order("status", { ascending: true })
+      .order("due_date", { ascending: true, nullsFirst: false }),
+  ]);
+  const defaultRole = roleFromEmail(user?.email);
 
   const contracts = (contractDocs ?? []).filter((d) => d.kind === "contract") as ContractDocument[];
   const changeOrders = (contractDocs ?? []).filter((d) => d.kind === "change_order") as ContractDocument[];
@@ -443,6 +457,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           )}
 
           {/* Material Orders */}
+          <JobTasksSection jobId={id} defaultRole={defaultRole} tasks={(jobTasks ?? []) as unknown as TaskRow[]} />
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">

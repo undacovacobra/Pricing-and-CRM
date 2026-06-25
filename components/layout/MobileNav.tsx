@@ -1,18 +1,17 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Briefcase, FolderOpen, Receipt, Tag, Settings, Calculator, CalendarDays, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, Receipt, Settings, Calculator, CalendarDays, MessageSquare, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileNavItems = [
   { href: "/",             label: "Home",     icon: LayoutDashboard },
   { href: "/calendar",     label: "Calendar", icon: CalendarDays },
+  { href: "/tasks",        label: "Tasks",    icon: ListChecks },
   { href: "/chat",         label: "Chat",     icon: MessageSquare },
   { href: "/jobs",         label: "Jobs",     icon: Briefcase },
   { href: "/customers",    label: "Clients",  icon: Users },
   { href: "/estimates",    label: "Estim",    icon: Calculator },
-  { href: "/documents",    label: "Docs",     icon: FolderOpen },
-  { href: "/pricing",      label: "Pricing",  icon: Tag },
   { href: "/commissions",  label: "Commiss",  icon: Receipt },
   { href: "/settings",     label: "Settings", icon: Settings },
 ];

@@ -117,6 +117,7 @@ export async function runDueStaffPush(db: SupabaseClient): Promise<number> {
     .from("calendar_events")
     .select("*")
     .eq("status", "scheduled")
+    .neq("event_type", "task") // task reminders are handled separately (daily)
     .gte("start_time", fromIso)
     .lte("start_time", toIso);
 

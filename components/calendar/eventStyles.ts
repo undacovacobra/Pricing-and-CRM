@@ -3,6 +3,7 @@ export const TYPE_LABELS: Record<string, string> = {
   install:     "Installer Visit",
   delivery:    "Delivery",
   personal:    "Personal",
+  task:        "Task",
 };
 
 export const TYPE_COLORS: Record<string, string> = {
@@ -10,6 +11,7 @@ export const TYPE_COLORS: Record<string, string> = {
   install:     "bg-amber-100 text-amber-700",
   delivery:    "bg-teal-100 text-teal-700",
   personal:    "bg-slate-100 text-slate-600",
+  task:        "bg-rose-100 text-rose-700",
 };
 
 export const TYPE_DOT_COLORS: Record<string, string> = {
@@ -17,6 +19,7 @@ export const TYPE_DOT_COLORS: Record<string, string> = {
   install:     "bg-amber-500",
   delivery:    "bg-teal-500",
   personal:    "bg-slate-400",
+  task:        "bg-rose-500",
 };
 
 export type AssigneeKind = "owner" | "designer" | "installer";

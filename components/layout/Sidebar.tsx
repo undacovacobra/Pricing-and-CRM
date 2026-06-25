@@ -5,14 +5,13 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  Tag,
   Settings,
   LogOut,
   Receipt,
-  FolderOpen,
   Calculator,
   CalendarDays,
   MessageSquare,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -20,12 +19,11 @@ import { createClient } from "@/lib/supabase/client";
 const navItems = [
   { href: "/",             label: "Dashboard",   icon: LayoutDashboard },
   { href: "/calendar",     label: "Calendar",    icon: CalendarDays },
+  { href: "/tasks",        label: "Tasks",       icon: ListChecks },
   { href: "/chat",         label: "Chat",        icon: MessageSquare },
   { href: "/jobs",         label: "Jobs",        icon: Briefcase },
   { href: "/customers",    label: "Customers",   icon: Users },
-  { href: "/documents",    label: "Documents",   icon: FolderOpen },
   { href: "/estimates",    label: "Estimates",   icon: Calculator },
-  { href: "/pricing",      label: "Pricing",     icon: Tag },
   { href: "/commissions",  label: "Commissions", icon: Receipt },
   { href: "/settings",     label: "Settings",    icon: Settings },
 ];

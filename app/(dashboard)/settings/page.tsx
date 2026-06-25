@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { FolderOpen, CheckCircle2, Tag, FileText, ChevronRight } from "lucide-react";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { googleConfigured } from "@/lib/google/drive";
 import { adminConfigured } from "@/lib/supabase/admin";
@@ -45,6 +46,29 @@ export default async function SettingsPage({
       </div>
 
       <SettingsForm settings={settings} />
+
+      {/* Catalog & Documents */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Catalog &amp; Documents</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Link
+            href="/pricing"
+            className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm hover:bg-slate-50"
+          >
+            <span className="flex items-center gap-2"><Tag className="h-4 w-4 text-slate-500" /> Pricing catalog</span>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+          </Link>
+          <Link
+            href="/documents"
+            className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm hover:bg-slate-50"
+          >
+            <span className="flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /> Documents</span>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Google Drive */}
       <Card>
