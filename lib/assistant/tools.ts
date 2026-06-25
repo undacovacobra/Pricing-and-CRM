@@ -8,6 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { APP_TIME_ZONE, formatTime } from "@/components/calendar/eventStyles";
 import { jobBalance, jobPaidSince, type JobPaymentFields } from "@/lib/payments";
+import { taskCalendarStart } from "@/lib/tasks/shared";
 
 // Renders a UTC ISO timestamp as "YYYY-MM-DD h:mm AM/PM" in the business's
 // local timezone — never raw-slice a UTC string, it silently shows UTC.
@@ -338,6 +339,85 @@ export const ASSISTANT_TOOLS: ToolDef[] = [
       required: ["job_id", "milestone"],
     },
   },
+  {
+    name: "list_tasks",
+    description:
+      "List to-do tasks for Travis and Carol. Defaults to open tasks. Use for 'what's on my list', 'what tasks does Carol have', 'what's overdue', 'tasks for the Smith job'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: { type: "string", description: "open (default) or done." },
+        person: { type: "string", description: "Optional: 'me', 'Travis', or 'Carol' to filter by owner." },
+        job_id: { type: "string", description: "Optional job UUID to scope to." },
+      },
+    },
+  },
+  {
+    name: "create_task",
+    description:
+      "Create a to-do task. With a due date it shows on the calendar and reminds the owner daily until done. If it relates to a job, look up the job_id with search_jobs and pass it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "What needs doing." },
+        due_date: { type: "string", description: "Optional due date, YYYY-MM-DD." },
+        due_time: { type: "string", description: "Optional due time, 24h HH:MM (only with a due date)." },
+        person: { type: "string", description: "Who it's for: 'me', 'Travis', or 'Carol'. Defaults to the current user." },
+        job_id: { type: "string", description: "Optional linked job UUID." },
+        description: { type: "string", description: "Optional extra detail." },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "complete_task",
+    description: "Mark a task done. Identify it by task_id, or by title text (matches an open task). Use 'mark X as done'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The task's UUID (from list_tasks)." },
+        title: { type: "string", description: "Alternatively, text to match against an open task's title." },
+      },
+    },
+  },
+  {
+    name: "reopen_task",
+    description: "Reopen a completed task. Identify by task_id or title.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The task's UUID." },
+        title: { type: "string", description: "Alternatively, text to match against a task's title." },
+      },
+    },
+  },
+  {
+    name: "update_task",
+    description: "Change a task: its title, due date/time, owner, or job link. Identify by task_id or current title.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The task's UUID." },
+        title: { type: "string", description: "Text to match the task to change (if no task_id)." },
+        new_title: { type: "string", description: "New title." },
+        due_date: { type: "string", description: "New due date YYYY-MM-DD (empty string clears it)." },
+        due_time: { type: "string", description: "New due time HH:MM." },
+        person: { type: "string", description: "New owner: 'me', 'Travis', or 'Carol'." },
+        job_id: { type: "string", description: "Link to a job UUID." },
+      },
+    },
+  },
+  {
+    name: "delete_task",
+    description: "Delete a task entirely. Identify by task_id or title. Prefer complete_task unless the user really wants it removed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "The task's UUID." },
+        title: { type: "string", description: "Alternatively, text to match against a task's title." },
+      },
+    },
+  },
 ];
 
 // ---- Gemini function declarations ------------------------------------------
@@ -420,6 +500,18 @@ export async function executeAssistantTool(
       return updateCommission(supabase, input);
     case "set_payment_milestone":
       return setPaymentMilestone(supabase, input);
+    case "list_tasks":
+      return listTasks(supabase, input, ctx);
+    case "create_task":
+      return createTaskTool(supabase, input, ctx);
+    case "complete_task":
+      return setTaskStatus(supabase, input, "done");
+    case "reopen_task":
+      return setTaskStatus(supabase, input, "open");
+    case "update_task":
+      return updateTaskTool(supabase, input, ctx);
+    case "delete_task":
+      return deleteTaskTool(supabase, input);
     default:
       return `Unknown tool: ${name}`;
   }
@@ -942,4 +1034,147 @@ async function setPaymentMilestone(supabase: SupabaseClient, input: Json): Promi
   if (error) return `Could not update the milestone: ${error.message}`;
   if (!data) return "No job found with that id.";
   return `Marked ${milestone.replace("_", " ")} ${paid ? "paid" : "unpaid"} on "${data.title}".`;
+}
+
+// ---- Task tools -------------------------------------------------------------
+
+function taskTimeLabel(due: string | null, time: string | null): string {
+  if (!due) return "no due date";
+  const at = time && /^\d{2}:\d{2}$/.test(time) ? ` ${time}` : "";
+  return `due ${due}${at}`;
+}
+
+// Resolves a task by explicit id, else by matching title text (open tasks first).
+async function findTask(
+  supabase: SupabaseClient,
+  input: Json,
+): Promise<{ id: string; title: string; calendar_event_id: string | null } | null> {
+  if (input.task_id) {
+    const { data } = await supabase.from("tasks").select("id, title, calendar_event_id").eq("id", input.task_id as string).maybeSingle();
+    return data ?? null;
+  }
+  const title = (input.title as string | undefined)?.trim().toLowerCase();
+  if (!title) return null;
+  const { data } = await supabase.from("tasks").select("id, title, calendar_event_id, status").order("status").limit(200);
+  const rows = data ?? [];
+  return rows.find((t) => (t.title as string)?.toLowerCase().includes(title)) ?? null;
+}
+
+async function listTasks(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
+  const status = (input.status as string | undefined)?.toLowerCase() === "done" ? "done" : "open";
+  let q = supabase
+    .from("tasks")
+    .select("id, title, due_date, due_time, assigned_to, status, job:jobs(title)")
+    .eq("status", status)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(100);
+  if (input.person) q = q.eq("assigned_to", resolveRole(input.person as string, ctx));
+  if (input.job_id) q = q.eq("job_id", input.job_id as string);
+  const { data, error } = await q;
+  if (error) return `Error listing tasks: ${error.message}`;
+  if (!data?.length) return status === "open" ? "No open tasks." : "No completed tasks.";
+  return data
+    .map((t) => {
+      const job = t.job as { title?: string } | null;
+      return `- [${t.id}] ${t.title} · ${taskTimeLabel(t.due_date as string, t.due_time as string)} · ${personLabel(t.assigned_to)}${job?.title ? ` · job: ${job.title}` : ""}`;
+    })
+    .join("\n");
+}
+
+async function createTaskTool(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
+  const title = (input.title as string)?.trim();
+  if (!title) return "Need a title to create a task.";
+  const assigned = resolveRole(input.person as string, ctx);
+  const dueDate = (input.due_date as string | undefined)?.trim() || null;
+  const dueTime = (input.due_time as string | undefined)?.trim();
+  const validTime = dueTime && /^\d{2}:\d{2}$/.test(dueTime) ? dueTime : null;
+
+  const { data: task, error } = await supabase
+    .from("tasks")
+    .insert({
+      title,
+      description: (input.description as string) || null,
+      due_date: dueDate,
+      due_time: validTime,
+      assigned_to: assigned,
+      job_id: (input.job_id as string) || null,
+      status: "open",
+      created_by: ctx.role,
+    })
+    .select("id")
+    .single();
+  if (error) return `Could not create the task: ${error.message}`;
+
+  if (dueDate && task) {
+    const { data: ev } = await supabase
+      .from("calendar_events")
+      .insert({
+        title: `Task: ${title}`,
+        event_type: "task",
+        assigned_to: assigned,
+        job_id: (input.job_id as string) || null,
+        start_time: taskCalendarStart(dueDate, validTime),
+        status: "scheduled",
+      })
+      .select("id")
+      .single();
+    if (ev) await supabase.from("tasks").update({ calendar_event_id: ev.id }).eq("id", task.id);
+  }
+  return `Created task "${title}" for ${personLabel(assigned)} (${taskTimeLabel(dueDate, validTime)}).`;
+}
+
+async function setTaskStatus(supabase: SupabaseClient, input: Json, status: "open" | "done"): Promise<string> {
+  const task = await findTask(supabase, input);
+  if (!task) return "Couldn't find that task — try list_tasks to get its id.";
+  const patch: Record<string, unknown> =
+    status === "done"
+      ? { status: "done", completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+      : { status: "open", completed_at: null, last_reminded_on: null, updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
+  if (error) return `Could not update the task: ${error.message}`;
+  if (task.calendar_event_id) {
+    await supabase.from("calendar_events").update({ status: status === "done" ? "cancelled" : "scheduled" }).eq("id", task.calendar_event_id);
+  }
+  return status === "done" ? `Marked "${task.title}" done.` : `Reopened "${task.title}".`;
+}
+
+async function updateTaskTool(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
+  const task = await findTask(supabase, input);
+  if (!task) return "Couldn't find that task — try list_tasks to get its id.";
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.new_title) patch.title = String(input.new_title).trim();
+  if (input.due_date !== undefined) patch.due_date = (input.due_date as string) || null;
+  if (input.due_time !== undefined) {
+    const t = (input.due_time as string)?.trim();
+    patch.due_time = t && /^\d{2}:\d{2}$/.test(t) ? t : null;
+  }
+  if (input.person) patch.assigned_to = resolveRole(input.person as string, ctx);
+  if (input.job_id !== undefined) patch.job_id = (input.job_id as string) || null;
+  if (Object.keys(patch).length === 1) return "Nothing to change — specify a new value.";
+
+  const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
+  if (error) return `Could not update the task: ${error.message}`;
+
+  // Keep the linked calendar reminder in sync with date/time/title/owner changes.
+  if (task.calendar_event_id) {
+    const evPatch: Record<string, unknown> = {};
+    if (patch.title) evPatch.title = `Task: ${patch.title}`;
+    if (patch.assigned_to) evPatch.assigned_to = patch.assigned_to;
+    if (input.job_id !== undefined) evPatch.job_id = (input.job_id as string) || null;
+    if (input.due_date !== undefined || input.due_time !== undefined) {
+      const { data: cur } = await supabase.from("tasks").select("due_date, due_time").eq("id", task.id).maybeSingle();
+      if (cur?.due_date) evPatch.start_time = taskCalendarStart(cur.due_date as string, cur.due_time as string);
+    }
+    if (Object.keys(evPatch).length) await supabase.from("calendar_events").update(evPatch).eq("id", task.calendar_event_id);
+  }
+  return `Updated "${task.title}".`;
+}
+
+async function deleteTaskTool(supabase: SupabaseClient, input: Json): Promise<string> {
+  const task = await findTask(supabase, input);
+  if (!task) return "Couldn't find that task — try list_tasks to get its id.";
+  if (task.calendar_event_id) await supabase.from("calendar_events").delete().eq("id", task.calendar_event_id);
+  const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+  if (error) return `Could not delete the task: ${error.message}`;
+  return `Deleted "${task.title}".`;
 }
