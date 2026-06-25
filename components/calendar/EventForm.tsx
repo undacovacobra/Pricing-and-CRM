@@ -329,11 +329,11 @@ export function EventForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="start_time">Date *</Label>
-                <Input id="start_time" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Input id="start_time" type="datetime-local" step={900} value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="end_time_only">Ends</Label>
-                <Input id="end_time_only" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <Input id="end_time_only" type="time" step={900} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
               </div>
             </div>
             <label className="flex items-center gap-2 pt-1">

@@ -85,6 +85,7 @@ export function AddTaskForm({
           Time
           <input
             type="time"
+            step={900}
             value={dueTime}
             onChange={(e) => setDueTime(e.target.value)}
             disabled={!dueDate}
