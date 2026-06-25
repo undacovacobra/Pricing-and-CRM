@@ -136,12 +136,13 @@ export function AssistantWidget() {
     }
   }
 
-  // Hands-free conversation: heard speech -> send -> speak the reply -> listen
-  // again, looping until the user turns voice mode off.
+  // Every voice turn always speaks the reply out loud — whether it's a single
+  // tap-to-ask from the composer, or one leg of a hands-free conversation. It
+  // only keeps listening for the next turn when hands-free mode is on.
   const handleVoiceTurn = useCallback(
     async (text: string) => {
       const reply = await send(text);
-      if (reply && voiceModeRef.current) {
+      if (reply) {
         voice.speak(reply, () => {
           if (voiceModeRef.current) voice.startListening(handleVoiceTurn);
         });
@@ -164,16 +165,14 @@ export function AssistantWidget() {
     }
   }
 
-  // One-shot dictation: drop spoken words into the text box for review.
-  function dictate() {
+  // Tap-to-ask: speak one question, hear one spoken answer back. No typing
+  // involved — meant for when your hands are full.
+  function askByVoice() {
     if (voice.listening) {
       voice.stopListening();
       return;
     }
-    voice.startListening((text) => {
-      setInput((prev) => (prev ? `${prev} ${text}` : text));
-      inputRef.current?.focus();
-    });
+    voice.startListening(handleVoiceTurn);
   }
 
   // Turning the panel off stops any audio in flight.
@@ -225,8 +224,9 @@ export function AssistantWidget() {
             </div>
           </div>
 
-          {/* Voice conversation status */}
-          {voiceMode && (
+          {/* Voice conversation status — shown for hands-free mode, and briefly
+              for a single tap-to-ask turn so it's obvious it's listening/speaking. */}
+          {(voiceMode || voice.listening || voice.speaking) && (
             <div className="flex items-center justify-between gap-2 px-4 py-2 bg-emerald-50 border-b border-emerald-100 text-emerald-800">
               <div className="flex items-center gap-2 text-sm font-medium">
                 {voice.speaking ? (
@@ -251,7 +251,7 @@ export function AssistantWidget() {
                   </>
                 )}
               </div>
-              {!voice.listening && !voice.speaking && !sending && (
+              {voiceMode && !voice.listening && !voice.speaking && !sending && (
                 <button
                   onClick={() => voice.startListening(handleVoiceTurn)}
                   className="text-xs font-semibold rounded-full bg-emerald-600 text-white px-3 py-1 hover:bg-emerald-700"
@@ -267,6 +267,14 @@ export function AssistantWidget() {
             {bubbles.length === 0 && (
               <div className="text-center py-6 space-y-4">
                 <p className="text-sm text-slate-500">Ask about jobs, customers, the calendar, or commissions — or have me schedule something or jot a note.</p>
+                {voice.supported && !voiceMode && (
+                  <button
+                    onClick={toggleVoiceMode}
+                    className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white text-sm font-semibold px-4 py-2 hover:bg-emerald-700"
+                  >
+                    <Mic className="h-4 w-4" /> Talk to me — hands-free
+                  </button>
+                )}
                 <div className="flex flex-col gap-2">
                   {SUGGESTIONS.map((s) => (
                     <button
@@ -344,9 +352,9 @@ export function AssistantWidget() {
               )}
               {voice.supported && !voiceMode && (
                 <button
-                  onClick={dictate}
-                  aria-label={voice.listening ? "Stop dictation" : "Dictate a message"}
-                  title="Tap to speak your message"
+                  onClick={askByVoice}
+                  aria-label={voice.listening ? "Stop" : "Ask out loud and hear the answer"}
+                  title="Tap, ask your question out loud, and I'll answer out loud"
                   className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center hover:bg-slate-50 ${
                     voice.listening ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "text-slate-600"
                   }`}
