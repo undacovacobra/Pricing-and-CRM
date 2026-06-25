@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CloudOff, RefreshCw } from "lucide-react";
 import { flushPendingDrawings } from "@/lib/offline/sync";
+import { primeOfflineCache } from "@/lib/offline/prime";
 import { getPendingDrawings } from "@/lib/offline/db";
 
 // Shows a small banner when offline or when there are unsynced drawings, and
@@ -29,12 +30,17 @@ export function OfflineManager() {
   useEffect(() => {
     setOnline(navigator.onLine);
     refreshPending();
-    // Warm the offline workspace + its scripts into the cache while we can.
-    if (navigator.onLine) router.prefetch("/offline");
+    // Warm the offline workspace + its scripts into the cache while we can, and
+    // mirror all jobs/drawings/files onto the device for offline use.
+    if (navigator.onLine) {
+      router.prefetch("/offline");
+      primeOfflineCache();
+    }
 
     function onOnline() {
       setOnline(true);
       sync();
+      primeOfflineCache();
     }
     function onOffline() {
       setOnline(false);

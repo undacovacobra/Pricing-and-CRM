@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { CloudOff, Pencil, ChevronLeft, FileText, Plus, RefreshCw, Wifi } from "lucide-react";
 import { DrawingCanvas } from "@/components/drawings/DrawingCanvas";
 import { flushPendingDrawings } from "@/lib/offline/sync";
+import { primeOfflineCache } from "@/lib/offline/prime";
 import {
   getAllJobs,
   getAllDrawings,
@@ -73,8 +74,15 @@ export default function OfflineWorkspace() {
 
   useEffect(() => {
     setOnline(navigator.onLine);
-    load();
-    const on = () => setOnline(true);
+    // If we happen to be online here, pull everything down first, then list it.
+    (async () => {
+      if (navigator.onLine) await primeOfflineCache();
+      await load();
+    })();
+    const on = () => {
+      setOnline(true);
+      primeOfflineCache().then(() => load());
+    };
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
@@ -110,6 +118,7 @@ export default function OfflineWorkspace() {
   async function sync() {
     setSyncing(true);
     await flushPendingDrawings();
+    await primeOfflineCache(true);
     setSyncing(false);
     await load();
   }
