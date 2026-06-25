@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { APP_TIME_ZONE, formatTime } from "@/components/calendar/eventStyles";
+import { jobBalance, jobPaidSince, type JobPaymentFields } from "@/lib/payments";
 
 // Renders a UTC ISO timestamp as "YYYY-MM-DD h:mm AM/PM" in the business's
 // local timezone — never raw-slice a UTC string, it silently shows UTC.
@@ -66,10 +67,21 @@ interface ToolDef {
 // "owner" = Travis, "designer" = Carol — the values stored in assigned_to / author.
 export type TeamRole = "owner" | "designer";
 
+// A file the user attached to the chat, already uploaded to a staging path in
+// the job-attachments bucket. The assistant can file it into a job on request.
+export interface StagedAttachment {
+  file_name: string;
+  storage_path: string;
+  file_size?: number;
+  file_type?: string;
+}
+
 export interface AssistantContext {
   // Who is chatting — resolves "me"/"my" and attributes notes.
   role: TeamRole;
   name: string;
+  // Files attached to the current message, staged and awaiting filing.
+  attachments?: StagedAttachment[];
 }
 
 function personLabel(v: string | null | undefined): string {
@@ -176,6 +188,156 @@ export const ASSISTANT_TOOLS: ToolDef[] = [
       required: ["job_id", "content"],
     },
   },
+  {
+    name: "list_job_files",
+    description:
+      "List every file and drawing attached to a job: uploaded attachments (PDFs, photos, receipts), hand drawings, job photos, contract/change-order documents, and generated documents. Use to answer 'what files / drawings / photos does job X have'.",
+    input_schema: {
+      type: "object",
+      properties: { job_id: { type: "string", description: "The job's UUID." } },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "read_team_chat",
+    description:
+      "Read the most recent messages from the internal team chat between Travis and Carol. Use for 'what did Carol say', 'catch me up on the chat', etc.",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "integer", description: "How many recent messages (default 20, max 50)." } },
+    },
+  },
+  {
+    name: "list_documents",
+    description:
+      "List generated documents (contracts, invoices, change orders, quotes), optionally for one job or by type/status. Use for 'what invoices are out', 'unsigned contracts', etc.",
+    input_schema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "Optional job UUID to scope to." },
+        document_type: { type: "string", description: "Optional: contract, invoice, change_order, or quote." },
+        status: { type: "string", description: "Optional: draft, sent, viewed, signed, paid, or void." },
+      },
+    },
+  },
+  {
+    name: "list_estimates",
+    description: "List estimates, optionally for one job. Shows name, status, and margin. Use for estimate/quote questions.",
+    input_schema: {
+      type: "object",
+      properties: { job_id: { type: "string", description: "Optional job UUID to scope to." } },
+    },
+  },
+  {
+    name: "search_pricing",
+    description:
+      "Search the pricing catalog (cabinets, countertops, labor, hardware, etc.) by name or category. Returns unit and unit price. Use for 'how much do we charge for X'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Free text to match item name or category. Omit to list by category." },
+        limit: { type: "integer", description: "Max results (default 20, max 50)." },
+      },
+    },
+  },
+  {
+    name: "list_material_orders",
+    description: "List material orders for a job: vendor, description, order/arrival dates. Use for 'what's on order' / 'has the cabinet shipment arrived'.",
+    input_schema: {
+      type: "object",
+      properties: { job_id: { type: "string", description: "The job's UUID." } },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "get_money_summary",
+    description:
+      "Get a business-wide money snapshot: total outstanding balance across all jobs, payments received in the last 7 days, and a list of jobs still owing. Use for 'how much are we owed', 'who still owes money', 'what came in this week'.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "attach_file_to_job",
+    description:
+      "File a user-attached document into a job, so it shows up under the job's files. Only works when the user has attached one or more files to the current message. Look up the job_id first with search_jobs if you only have a name. If multiple files are attached and the user only wants some, pass file_name to pick.",
+    input_schema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "The job's UUID to file the attachment into." },
+        file_name: { type: "string", description: "Optional: the name of the specific attached file to file. Omit to file all attached files." },
+      },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "update_job",
+    description:
+      "Update fields on a job: stage, assigned person, dates, address, contract amount, description, or notes. Look up the job_id with search_jobs first. Only pass the fields you want to change.",
+    input_schema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "The job's UUID." },
+        stage: { type: "string", description: "lead, proposal_sent, contract_signed, in_progress, in_install, finished, or cancelled." },
+        assigned_to: { type: "string", description: "'me', 'Travis', or 'Carol'." },
+        start_date: { type: "string", description: "YYYY-MM-DD." },
+        estimated_end_date: { type: "string", description: "YYYY-MM-DD." },
+        job_address: { type: "string", description: "Job site address." },
+        contract_amount: { type: "number", description: "Contract dollar amount." },
+        description: { type: "string", description: "Job description." },
+        notes: { type: "string", description: "Job notes (overwrites the notes field)." },
+      },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "create_customer",
+    description: "Create a new customer record. Confirm at least a name before calling. Returns the new customer id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        first_name: { type: "string", description: "First name." },
+        last_name: { type: "string", description: "Last name." },
+        email: { type: "string", description: "Optional email." },
+        phone: { type: "string", description: "Optional phone." },
+        address_line1: { type: "string", description: "Optional street address." },
+        city: { type: "string", description: "Optional city." },
+        state: { type: "string", description: "Optional state." },
+        zip: { type: "string", description: "Optional ZIP." },
+        notes: { type: "string", description: "Optional notes." },
+      },
+      required: ["first_name"],
+    },
+  },
+  {
+    name: "update_commission",
+    description:
+      "Update a designer commission: mark it paid (with amount, method) or change its amount/notes. List commissions first to get context. Identify by job name or commission description.",
+    input_schema: {
+      type: "object",
+      properties: {
+        commission_id: { type: "string", description: "The commission's UUID (from list_commissions if available)." },
+        job_id: { type: "string", description: "Alternatively, the job UUID to find the commission by." },
+        mark_paid: { type: "boolean", description: "Set true to mark it paid." },
+        paid_amount: { type: "number", description: "Amount paid." },
+        payment_method: { type: "string", description: "check, cash, Zelle, etc." },
+        amount: { type: "number", description: "Change the commission's billed amount." },
+        notes: { type: "string", description: "Update notes." },
+      },
+    },
+  },
+  {
+    name: "set_payment_milestone",
+    description:
+      "Mark a job's payment milestone paid or unpaid: deposit (50%), delivery (40%), completion (10%), or change_orders (100% of change orders). Stamps the paid date. Use for 'mark the deposit on the Smith job as paid'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "The job's UUID." },
+        milestone: { type: "string", description: "deposit, delivery, completion, or change_orders." },
+        paid: { type: "boolean", description: "true to mark paid, false to unmark. Default true." },
+      },
+      required: ["job_id", "milestone"],
+    },
+  },
 ];
 
 // ---- Gemini function declarations ------------------------------------------
@@ -234,6 +396,30 @@ export async function executeAssistantTool(
       return createAppointment(supabase, input, ctx);
     case "add_job_note":
       return addJobNote(supabase, input, ctx);
+    case "list_job_files":
+      return listJobFiles(supabase, input);
+    case "read_team_chat":
+      return readTeamChat(supabase, input);
+    case "list_documents":
+      return listDocuments(supabase, input);
+    case "list_estimates":
+      return listEstimates(supabase, input);
+    case "search_pricing":
+      return searchPricing(supabase, input);
+    case "list_material_orders":
+      return listMaterialOrders(supabase, input);
+    case "get_money_summary":
+      return getMoneySummary(supabase);
+    case "attach_file_to_job":
+      return attachFileToJob(supabase, input, ctx);
+    case "update_job":
+      return updateJob(supabase, input, ctx);
+    case "create_customer":
+      return createCustomer(supabase, input);
+    case "update_commission":
+      return updateCommission(supabase, input);
+    case "set_payment_milestone":
+      return setPaymentMilestone(supabase, input);
     default:
       return `Unknown tool: ${name}`;
   }
@@ -448,4 +634,312 @@ async function addJobNote(supabase: SupabaseClient, input: Json, ctx: AssistantC
   const { error } = await supabase.from("job_notes").insert({ job_id: jobId, author: ctx.role, content });
   if (error) return `Could not add the note: ${error.message}`;
   return `Added a note to "${job.title}".`;
+}
+
+// ---- Additional read tools --------------------------------------------------
+
+async function listJobFiles(supabase: SupabaseClient, input: Json): Promise<string> {
+  const jobId = input.job_id as string;
+  if (!jobId) return "Need a job_id — look it up with search_jobs first.";
+  const { data: job } = await supabase.from("jobs").select("title").eq("id", jobId).maybeSingle();
+  if (!job) return "No job found with that id.";
+
+  const [att, draw, photos, contracts, docs] = await Promise.all([
+    supabase.from("job_attachments").select("file_name, file_size, created_at").eq("job_id", jobId).order("created_at", { ascending: false }),
+    supabase.from("job_drawings").select("label, updated_at").eq("job_id", jobId).order("updated_at", { ascending: false }),
+    supabase.from("job_photos").select("caption, phase, created_at").eq("job_id", jobId).order("created_at", { ascending: false }),
+    supabase.from("contract_documents").select("kind, file_name, amount, created_at").eq("job_id", jobId).order("created_at", { ascending: false }),
+    supabase.from("documents").select("document_type, document_number, title, status").eq("job_id", jobId).order("created_at", { ascending: false }),
+  ]);
+
+  const lines: string[] = [`Files for "${job.title}":`];
+  const a = att.data ?? [];
+  const d = draw.data ?? [];
+  const p = photos.data ?? [];
+  const c = contracts.data ?? [];
+  const g = docs.data ?? [];
+  if (a.length) {
+    lines.push(`Attachments (${a.length}):`);
+    a.forEach((r) => lines.push(`  · ${r.file_name}${r.file_size ? ` (${Math.round((r.file_size as number) / 1024)} KB)` : ""}`));
+  }
+  if (d.length) {
+    lines.push(`Drawings (${d.length}):`);
+    d.forEach((r) => lines.push(`  · ${r.label || "Untitled"}`));
+  }
+  if (p.length) {
+    lines.push(`Photos (${p.length}):`);
+    p.forEach((r) => lines.push(`  · ${r.caption || "(no caption)"}${r.phase ? ` [${r.phase}]` : ""}`));
+  }
+  if (c.length) {
+    lines.push(`Contract docs (${c.length}):`);
+    c.forEach((r) => lines.push(`  · ${r.kind}${r.file_name ? `: ${r.file_name}` : ""}${r.amount != null ? ` — $${Number(r.amount).toFixed(0)}` : ""}`));
+  }
+  if (g.length) {
+    lines.push(`Generated documents (${g.length}):`);
+    g.forEach((r) => lines.push(`  · ${r.document_type} ${r.document_number || ""} — ${r.title || ""} (${r.status})`));
+  }
+  if (lines.length === 1) lines.push("(no files yet)");
+  return lines.join("\n");
+}
+
+async function readTeamChat(supabase: SupabaseClient, input: Json): Promise<string> {
+  const limit = Math.min(Number(input.limit) || 20, 50);
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("sender_email, content, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return `Error reading chat: ${error.message}`;
+  if (!data?.length) return "No chat messages yet.";
+  return data
+    .slice()
+    .reverse()
+    .map((m) => `${personLabel(roleForEmail(m.sender_email as string))} (${formatLocal(m.created_at as string)}): ${m.content}`)
+    .join("\n");
+}
+
+// Maps a chat sender email to the stored role label used elsewhere.
+function roleForEmail(email: string | null | undefined): TeamRole | string {
+  const e = (email ?? "").toLowerCase();
+  if (e === "carol@coastaledgedesign.com") return "designer";
+  if (e === "thetravisj1989@gmail.com") return "owner";
+  return e.split("@")[0] || "Unknown";
+}
+
+async function listDocuments(supabase: SupabaseClient, input: Json): Promise<string> {
+  let q = supabase
+    .from("documents")
+    .select("document_type, document_number, title, status, due_date, job:jobs(title)")
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (input.job_id) q = q.eq("job_id", input.job_id as string);
+  if (input.document_type) q = q.eq("document_type", input.document_type as string);
+  if (input.status) q = q.eq("status", input.status as string);
+  const { data, error } = await q;
+  if (error) return `Error listing documents: ${error.message}`;
+  if (!data?.length) return "No matching documents found.";
+  return data
+    .map((r) => {
+      const job = r.job as { title?: string } | null;
+      return `- ${r.document_type} ${r.document_number || ""} "${r.title || ""}" · ${r.status}${job?.title ? ` · job: ${job.title}` : ""}${r.due_date ? ` · due ${r.due_date}` : ""}`;
+    })
+    .join("\n");
+}
+
+async function listEstimates(supabase: SupabaseClient, input: Json): Promise<string> {
+  let q = supabase
+    .from("estimates")
+    .select("name, status, margin, created_at, job:jobs(title)")
+    .order("created_at", { ascending: false })
+    .limit(40);
+  if (input.job_id) q = q.eq("job_id", input.job_id as string);
+  const { data, error } = await q;
+  if (error) return `Error listing estimates: ${error.message}`;
+  if (!data?.length) return "No estimates found.";
+  return data
+    .map((r) => {
+      const job = r.job as { title?: string } | null;
+      return `- "${r.name}" · ${r.status || "draft"}${r.margin != null ? ` · margin ${r.margin}%` : ""}${job?.title ? ` · job: ${job.title}` : ""}`;
+    })
+    .join("\n");
+}
+
+async function searchPricing(supabase: SupabaseClient, input: Json): Promise<string> {
+  const query = (input.query as string | undefined)?.trim();
+  const limit = Math.min(Number(input.limit) || 20, 50);
+  const { data, error } = await supabase
+    .from("pricing_items")
+    .select("name, category, unit, unit_price")
+    .eq("is_active", true)
+    .order("category")
+    .limit(500);
+  if (error) return `Error searching pricing: ${error.message}`;
+  let rows = data ?? [];
+  if (query) {
+    const ql = query.toLowerCase();
+    rows = rows.filter((r) => `${r.name ?? ""} ${r.category ?? ""}`.toLowerCase().includes(ql));
+  }
+  rows = rows.slice(0, limit);
+  if (!rows.length) return "No matching pricing items found.";
+  return rows
+    .map((r) => `- ${r.name}${r.category ? ` [${r.category}]` : ""}: $${Number(r.unit_price ?? 0).toFixed(2)}${r.unit ? ` / ${r.unit}` : ""}`)
+    .join("\n");
+}
+
+async function listMaterialOrders(supabase: SupabaseClient, input: Json): Promise<string> {
+  const jobId = input.job_id as string;
+  if (!jobId) return "Need a job_id — look it up with search_jobs first.";
+  const { data, error } = await supabase
+    .from("material_orders")
+    .select("vendor, description, ordered_at, estimated_arrival, actual_arrival")
+    .eq("job_id", jobId)
+    .order("ordered_at", { ascending: false });
+  if (error) return `Error listing material orders: ${error.message}`;
+  if (!data?.length) return "No material orders for that job.";
+  return data
+    .map(
+      (m) =>
+        `- ${m.vendor}${m.description ? ` — ${m.description}` : ""}${m.actual_arrival ? ` (arrived ${m.actual_arrival})` : m.estimated_arrival ? ` (est. arrival ${m.estimated_arrival})` : m.ordered_at ? ` (ordered ${m.ordered_at})` : ""}`,
+    )
+    .join("\n");
+}
+
+async function getMoneySummary(supabase: SupabaseClient): Promise<string> {
+  const { data, error } = await supabase
+    .from("jobs")
+    .select(
+      "title, contract_amount, retainer_amount, pay_deposit_paid, pay_deposit_amount, pay_deposit_paid_at, pay_delivery_paid, pay_delivery_amount, pay_delivery_paid_at, pay_completion_paid, pay_completion_amount, pay_completion_paid_at, change_orders_paid, change_orders_paid_at, contract_documents(kind, amount)",
+    );
+  if (error) return `Error building money summary: ${error.message}`;
+  const rows = data ?? [];
+  const since = new Date(Date.now() - 7 * 86400000);
+  let outstanding = 0;
+  let received7 = 0;
+  const owing: string[] = [];
+  for (const j of rows) {
+    const docs = (j.contract_documents as { kind: string; amount: number | null }[]) ?? [];
+    const docContract = docs.filter((d) => d.kind !== "change_order").reduce((s, d) => s + (d.amount ?? 0), 0);
+    const contract = docContract || Number(j.contract_amount ?? 0);
+    const co = docs.filter((d) => d.kind === "change_order").reduce((s, d) => s + (d.amount ?? 0), 0);
+    const bal = jobBalance(j as unknown as JobPaymentFields, contract, co);
+    outstanding += bal.balanceDue;
+    received7 += jobPaidSince(j as unknown as JobPaymentFields, contract, co, since);
+    if (bal.balanceDue > 0.5) owing.push(`  · ${j.title}: $${bal.balanceDue.toFixed(0)} due`);
+  }
+  const lines = [
+    `Total outstanding across all jobs: $${outstanding.toFixed(0)}`,
+    `Payments received in the last 7 days: $${received7.toFixed(0)}`,
+  ];
+  if (owing.length) {
+    lines.push(`Jobs still owing (${owing.length}):`);
+    lines.push(...owing);
+  } else {
+    lines.push("No jobs currently owe a balance.");
+  }
+  return lines.join("\n");
+}
+
+// ---- Additional action tools ------------------------------------------------
+
+async function attachFileToJob(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
+  const jobId = input.job_id as string;
+  if (!jobId) return "Need a job_id — look it up with search_jobs first.";
+  const staged = ctx.attachments ?? [];
+  if (!staged.length) return "No file is attached to this message. Ask the user to attach the file, then try again.";
+  const { data: job } = await supabase.from("jobs").select("title").eq("id", jobId).maybeSingle();
+  if (!job) return "No job found with that id.";
+
+  const wanted = (input.file_name as string | undefined)?.trim().toLowerCase();
+  const targets = wanted ? staged.filter((s) => s.file_name.toLowerCase() === wanted) : staged;
+  if (!targets.length) return `None of the attached files match "${input.file_name}". Attached: ${staged.map((s) => s.file_name).join(", ")}.`;
+
+  const filed: string[] = [];
+  for (const f of targets) {
+    const destPath = `${jobId}/${Date.now()}-${f.file_name}`;
+    // Move the staged object into the job's folder (copy then remove staging).
+    const { error: copyErr } = await supabase.storage.from("job-attachments").copy(f.storage_path, destPath);
+    if (copyErr) return `Could not file "${f.file_name}": ${copyErr.message}`;
+    await supabase.storage.from("job-attachments").remove([f.storage_path]);
+    const { error: insErr } = await supabase
+      .from("job_attachments")
+      .insert({ job_id: jobId, storage_path: destPath, file_name: f.file_name, file_size: f.file_size ?? null });
+    if (insErr) return `Filed the upload but could not record it: ${insErr.message}`;
+    filed.push(f.file_name);
+  }
+  return `Filed ${filed.length} file(s) into "${job.title}": ${filed.join(", ")}.`;
+}
+
+async function updateJob(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
+  const jobId = input.job_id as string;
+  if (!jobId) return "Need a job_id — look it up with search_jobs first.";
+  const patch: Record<string, unknown> = {};
+  const stages = ["lead", "proposal_sent", "contract_signed", "in_progress", "in_install", "finished", "cancelled"];
+  if (input.stage) {
+    const s = String(input.stage).toLowerCase();
+    if (!stages.includes(s)) return `Invalid stage "${input.stage}". Valid: ${stages.join(", ")}.`;
+    patch.stage = s;
+  }
+  if (input.assigned_to) patch.assigned_to = resolveRole(input.assigned_to as string, ctx);
+  if (input.start_date) patch.start_date = input.start_date;
+  if (input.estimated_end_date) patch.estimated_end_date = input.estimated_end_date;
+  if (input.job_address !== undefined) patch.job_address = input.job_address;
+  if (input.contract_amount !== undefined) patch.contract_amount = Number(input.contract_amount);
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.notes !== undefined) patch.notes = input.notes;
+  if (!Object.keys(patch).length) return "Nothing to update — specify at least one field.";
+
+  const { data, error } = await supabase.from("jobs").update(patch).eq("id", jobId).select("title").maybeSingle();
+  if (error) return `Could not update the job: ${error.message}`;
+  if (!data) return "No job found with that id.";
+  return `Updated "${data.title}" (${Object.keys(patch).join(", ")}).`;
+}
+
+async function createCustomer(supabase: SupabaseClient, input: Json): Promise<string> {
+  const firstName = (input.first_name as string)?.trim();
+  if (!firstName) return "Need at least a first name to create a customer.";
+  const { data, error } = await supabase
+    .from("customers")
+    .insert({
+      first_name: firstName,
+      last_name: (input.last_name as string) || null,
+      email: (input.email as string) || null,
+      phone: (input.phone as string) || null,
+      address_line1: (input.address_line1 as string) || null,
+      city: (input.city as string) || null,
+      state: (input.state as string) || null,
+      zip: (input.zip as string) || null,
+      notes: (input.notes as string) || null,
+    })
+    .select("id, first_name, last_name")
+    .single();
+  if (error) return `Could not create the customer: ${error.message}`;
+  return `Created customer ${`${data.first_name ?? ""} ${data.last_name ?? ""}`.trim()}. [${data.id}]`;
+}
+
+async function updateCommission(supabase: SupabaseClient, input: Json): Promise<string> {
+  let commissionId = input.commission_id as string | undefined;
+  if (!commissionId && input.job_id) {
+    const { data } = await supabase
+      .from("designer_commissions")
+      .select("id")
+      .eq("job_id", input.job_id as string)
+      .order("submitted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    commissionId = data?.id;
+  }
+  if (!commissionId) return "Couldn't identify which commission — pass a commission_id or job_id.";
+
+  const patch: Record<string, unknown> = {};
+  if (input.mark_paid) {
+    patch.status = "paid";
+    patch.paid_at = new Date().toISOString();
+    if (input.paid_amount !== undefined) patch.paid_amount = Number(input.paid_amount);
+    if (input.payment_method) patch.payment_method = input.payment_method;
+  }
+  if (input.amount !== undefined) patch.amount = Number(input.amount);
+  if (input.notes !== undefined) patch.notes = input.notes;
+  if (!Object.keys(patch).length) return "Nothing to update on the commission.";
+
+  const { error } = await supabase.from("designer_commissions").update(patch).eq("id", commissionId);
+  if (error) return `Could not update the commission: ${error.message}`;
+  return input.mark_paid ? "Marked the commission as paid." : "Updated the commission.";
+}
+
+async function setPaymentMilestone(supabase: SupabaseClient, input: Json): Promise<string> {
+  const jobId = input.job_id as string;
+  const milestone = String(input.milestone || "").toLowerCase();
+  const paid = input.paid === undefined ? true : Boolean(input.paid);
+  const valid = ["deposit", "delivery", "completion", "change_orders"];
+  if (!jobId) return "Need a job_id — look it up with search_jobs first.";
+  if (!valid.includes(milestone)) return `Invalid milestone "${input.milestone}". Valid: ${valid.join(", ")}.`;
+
+  const paidCol = milestone === "change_orders" ? "change_orders_paid" : `pay_${milestone}_paid`;
+  const atCol = milestone === "change_orders" ? "change_orders_paid_at" : `pay_${milestone}_paid_at`;
+  const patch: Record<string, unknown> = { [paidCol]: paid, [atCol]: paid ? new Date().toISOString() : null };
+
+  const { data, error } = await supabase.from("jobs").update(patch).eq("id", jobId).select("title").maybeSingle();
+  if (error) return `Could not update the milestone: ${error.message}`;
+  if (!data) return "No job found with that id.";
+  return `Marked ${milestone.replace("_", " ")} ${paid ? "paid" : "unpaid"} on "${data.title}".`;
 }

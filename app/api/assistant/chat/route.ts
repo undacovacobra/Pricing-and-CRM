@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
-import { GEMINI_TOOL_DECLARATIONS, executeAssistantTool, type AssistantContext, type TeamRole } from "@/lib/assistant/tools";
+import { GEMINI_TOOL_DECLARATIONS, executeAssistantTool, type AssistantContext, type TeamRole, type StagedAttachment } from "@/lib/assistant/tools";
 import { APP_TIME_ZONE } from "@/components/calendar/eventStyles";
 
 export const maxDuration = 120;
@@ -34,13 +34,15 @@ function systemPrompt(ctx: AssistantContext): string {
     `The business operates in the ${APP_TIME_ZONE} timezone. The current date and time there is ${localNow} (ISO instant: ${now.toISOString()}). Use this — in ${APP_TIME_ZONE} — to resolve "today", "tomorrow", "next week", etc.`,
     `When you call create_appointment, give start_time as an ISO 8601 datetime with an explicit UTC offset for ${APP_TIME_ZONE} (e.g. -04:00 during daylight time, -05:00 during standard time) — never a bare datetime with no offset.`,
     "",
-    "You can look up jobs, customers, calendar appointments, and designer commissions, and you can take two actions: create calendar appointments and add notes to jobs.",
+    "You have broad access to the whole app. You can look up and report on jobs, customers, calendar appointments, commissions, the team chat, a job's files/drawings/photos/documents, estimates, the pricing catalog, material orders, and a business-wide money summary.",
+    "You can also make changes: create calendar appointments, add job notes, update jobs (stage, dates, assignee, contract amount, etc.), create customers, mark payment milestones and commissions paid, and file user-attached documents into a job.",
     "",
     "Guidelines:",
     "- Be concise and friendly. These are busy people in the field, often on a phone.",
-    "- Use the tools to answer from real data — never guess at job details, balances, or schedules.",
+    "- Use the tools to answer from real data — never guess at job details, balances, files, or schedules.",
     "- To act on a named customer or job, first look up its id with search_customers / search_jobs, then pass that id to the action tool so it links correctly.",
-    "- Before creating an appointment or adding a note, make sure you have what you need (for an appointment: a clear title, a specific date AND time, and who it's for). If something essential is missing or ambiguous, ask a brief clarifying question instead of guessing.",
+    "- Before an action that changes data (creating, updating, marking paid, filing a file), make sure you have what you need. If something essential is missing or ambiguous, ask a brief clarifying question instead of guessing.",
+    "- When the user attaches a file and asks to put it in a job, use search_jobs to find the job, then attach_file_to_job. The attached file is already uploaded — you just file it.",
     "- After taking an action, confirm what you did in one short sentence.",
     `- Interpret bare times the user mentions as ${APP_TIME_ZONE} local time.`,
   ].join("\n");
@@ -61,21 +63,37 @@ export async function POST(request: NextRequest) {
 
   let history: Content[] = [];
   let message = "";
+  let attachments: StagedAttachment[] = [];
   try {
     const body = await request.json();
     if (Array.isArray(body.messages)) history = body.messages;
     message = String(body.message ?? "").trim();
-    if (!message) throw new Error("empty message");
+    if (Array.isArray(body.attachments)) {
+      attachments = body.attachments
+        .filter((a: unknown): a is StagedAttachment => !!a && typeof (a as StagedAttachment).storage_path === "string")
+        .map((a: StagedAttachment) => ({
+          file_name: String(a.file_name),
+          storage_path: String(a.storage_path),
+          file_size: a.file_size,
+          file_type: a.file_type,
+        }));
+    }
+    if (!message && !attachments.length) throw new Error("empty message");
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
   const name = userNameForEmail(user.email) || "there";
   const role: TeamRole = (user.email ?? "").toLowerCase() === "carol@coastaledgedesign.com" ? "designer" : "owner";
-  const ctx: AssistantContext = { role, name };
+  const ctx: AssistantContext = { role, name, attachments };
+
+  // Let the model know what files came with this turn so it can offer to file them.
+  const userText = attachments.length
+    ? `${message || "(no message)"}\n\n[Attached file(s) ready to file into a job: ${attachments.map((a) => a.file_name).join(", ")}]`
+    : message;
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const contents: Content[] = [...history, { role: "user", parts: [{ text: message }] }];
+  const contents: Content[] = [...history, { role: "user", parts: [{ text: userText }] }];
 
   try {
     for (let turn = 0; turn < MAX_TURNS; turn++) {

@@ -1,12 +1,17 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, X, Send, Loader2 } from "lucide-react";
+import { Sparkles, X, Send, Loader2, Paperclip } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 // The full conversation (including tool-call turns) is held opaquely and
 // round-tripped to the server; the widget never constructs provider-specific
 // message shapes — it just stores what the server returns and resends it.
 type Bubble = { role: "user" | "assistant"; text: string };
+
+// A file the user picked, already uploaded to a staging path; handed to the
+// assistant so it can file it into a job on request.
+type StagedFile = { file_name: string; storage_path: string; file_size: number; file_type: string };
 
 const SUGGESTIONS = [
   "What's on my calendar this week?",
@@ -20,9 +25,13 @@ export function AssistantWidget() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [staged, setStaged] = useState<StagedFile[]>([]);
+  const [uploading, setUploading] = useState(false);
   const convo = useRef<unknown[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -32,17 +41,43 @@ export function AssistantWidget() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        // Stage into an inbox folder of the same bucket job files live in; the
+        // assistant moves it into the job's folder when asked to file it.
+        const path = `_inbox/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`;
+        const { error } = await supabase.storage.from("job-attachments").upload(path, file);
+        if (error) {
+          setBubbles((b) => [...b, { role: "assistant", text: `Couldn't upload ${file.name}: ${error.message}` }]);
+          continue;
+        }
+        setStaged((s) => [...s, { file_name: file.name, storage_path: path, file_size: file.size, file_type: file.type }]);
+      }
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   async function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || sending) return;
+    if ((!trimmed && staged.length === 0) || sending) return;
     setInput("");
-    setBubbles((b) => [...b, { role: "user", text: trimmed }]);
+    const sentFiles = staged;
+    setStaged([]);
+    const userBubble = sentFiles.length
+      ? `${trimmed}${trimmed ? "\n" : ""}📎 ${sentFiles.map((f) => f.file_name).join(", ")}`
+      : trimmed;
+    setBubbles((b) => [...b, { role: "user", text: userBubble }]);
     setSending(true);
     try {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: convo.current, message: trimmed }),
+        body: JSON.stringify({ messages: convo.current, message: trimmed, attachments: sentFiles }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -126,29 +161,59 @@ export function AssistantWidget() {
           </div>
 
           {/* Composer */}
-          <div className="border-t p-2 flex items-end gap-2">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send(input);
-                }
-              }}
-              rows={1}
-              placeholder="Ask me anything…"
-              className="flex-1 resize-none rounded-lg border px-3 py-2 text-sm max-h-32 focus:outline-none focus:ring-1 focus:ring-slate-400"
-            />
-            <button
-              onClick={() => send(input)}
-              disabled={sending || !input.trim()}
-              aria-label="Send"
-              className="h-9 w-9 shrink-0 rounded-lg bg-slate-900 text-white flex items-center justify-center disabled:opacity-40 hover:bg-slate-800"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+          <div className="border-t p-2 space-y-2">
+            {(staged.length > 0 || uploading) && (
+              <div className="flex flex-wrap gap-1.5 px-1">
+                {staged.map((f, i) => (
+                  <span key={f.storage_path} className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 text-xs pl-2 pr-1 py-1">
+                    <Paperclip className="h-3 w-3" />
+                    <span className="max-w-[140px] truncate">{f.file_name}</span>
+                    <button
+                      onClick={() => setStaged((s) => s.filter((_, j) => j !== i))}
+                      aria-label={`Remove ${f.file_name}`}
+                      className="rounded-full hover:bg-slate-200 p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {uploading && <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Loader2 className="h-3 w-3 animate-spin" /> uploading…</span>}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                aria-label="Attach file"
+                title="Attach a file"
+                className="h-9 w-9 shrink-0 rounded-lg border text-slate-600 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send(input);
+                  }
+                }}
+                rows={1}
+                placeholder="Ask me anything…"
+                className="flex-1 resize-none rounded-lg border px-3 py-2 text-sm max-h-32 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              />
+              <button
+                onClick={() => send(input)}
+                disabled={sending || (!input.trim() && staged.length === 0)}
+                aria-label="Send"
+                className="h-9 w-9 shrink-0 rounded-lg bg-slate-900 text-white flex items-center justify-center disabled:opacity-40 hover:bg-slate-800"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
