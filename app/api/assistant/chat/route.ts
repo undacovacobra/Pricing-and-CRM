@@ -99,16 +99,36 @@ export async function POST(request: NextRequest) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const contents: Content[] = [...history, { role: "user", parts: [{ text: userText }] }];
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // The model occasionally returns a transient 503 ("high demand"). Retry a few
+  // times with growing backoff so these blips recover without bothering the user.
+  async function generateWithRetry() {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await ai.models.generateContent({
+          model: MODEL,
+          contents,
+          config: {
+            systemInstruction: systemPrompt(ctx),
+            tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as unknown as FunctionDeclaration[] }],
+          },
+        });
+      } catch (err) {
+        lastErr = err;
+        const m = String(err);
+        const transient = m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded");
+        if (!transient || attempt === 2) throw err;
+        await sleep(800 * (attempt + 1)); // 0.8s, then 1.6s
+      }
+    }
+    throw lastErr;
+  }
+
   try {
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await ai.models.generateContent({
-        model: MODEL,
-        contents,
-        config: {
-          systemInstruction: systemPrompt(ctx),
-          tools: [{ functionDeclarations: GEMINI_TOOL_DECLARATIONS as unknown as FunctionDeclaration[] }],
-        },
-      });
+      const response = await generateWithRetry();
 
       const modelContent: Content = (response.candidates?.[0]?.content as Content) ?? { role: "model", parts: [] };
       contents.push(modelContent);
@@ -159,6 +179,13 @@ export async function POST(request: NextRequest) {
       const when = secs && secs > 90 ? "in a little while" : secs ? `in about ${secs} seconds` : "in a bit";
       return NextResponse.json({
         reply: `I've hit the free usage limit for the moment — please try again ${when}.`,
+        messages: contents,
+      });
+    }
+    // Transient overload that survived the retries above.
+    if (msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("overloaded")) {
+      return NextResponse.json({
+        reply: "The AI service is briefly overloaded right now. Give it a few seconds and try again.",
         messages: contents,
       });
     }
