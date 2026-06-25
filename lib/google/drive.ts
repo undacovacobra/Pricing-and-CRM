@@ -284,6 +284,25 @@ export async function exportGoogleDoc(
   return res.arrayBuffer();
 }
 
+// Downloads a Drive file's bytes. Regular files come down as-is; native Google
+// formats (Docs/Sheets/Slides) are exported to PDF since they have no raw bytes.
+export async function downloadDriveFile(
+  accessToken: string,
+  fileId: string,
+  mimeType: string,
+): Promise<{ bytes: ArrayBuffer; contentType: string; extension: string }> {
+  const isGoogleNative = mimeType.startsWith("application/vnd.google-apps");
+  if (isGoogleNative) {
+    const bytes = await exportGoogleDoc(accessToken, fileId, "application/pdf");
+    return { bytes, contentType: "application/pdf", extension: ".pdf" };
+  }
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive download failed: ${await res.text()}`);
+  return { bytes: await res.arrayBuffer(), contentType: mimeType || "application/octet-stream", extension: "" };
+}
+
 export function sourceMimeForFile(fileName: string): string {
   if (/\.docx$/i.test(fileName)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   if (/\.doc$/i.test(fileName)) return "application/msword";

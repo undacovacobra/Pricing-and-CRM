@@ -1,8 +1,9 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, X, Send, Loader2, Paperclip } from "lucide-react";
+import { Sparkles, X, Send, Loader2, Paperclip, HardDrive } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { openDrivePicker, pickerConfigured } from "@/lib/google/picker";
 
 // The full conversation (including tool-call turns) is held opaquely and
 // round-tripped to the server; the widget never constructs provider-specific
@@ -59,6 +60,37 @@ export function AssistantWidget() {
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function pickFromDrive() {
+    setUploading(true);
+    try {
+      const picked = await openDrivePicker();
+      for (const f of picked) {
+        const res = await fetch("/api/assistant/import-drive-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileId: f.id, fileName: f.name, mimeType: f.mimeType }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setBubbles((b) => [...b, { role: "assistant", text: `Couldn't get "${f.name}" from Drive: ${data.detail || data.error || "error"}` }]);
+          continue;
+        }
+        setStaged((s) => [...s, { file_name: data.file_name, storage_path: data.storage_path, file_size: data.file_size, file_type: data.file_type }]);
+      }
+    } catch (e) {
+      const msg = String(e instanceof Error ? e.message : e);
+      const friendly =
+        msg.includes("not_connected")
+          ? "Connect Google Drive first in Settings, then try again."
+          : msg.includes("not_configured")
+          ? "The Google Drive picker isn't set up yet."
+          : `Couldn't open Google Drive: ${msg}`;
+      setBubbles((b) => [...b, { role: "assistant", text: friendly }]);
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -185,12 +217,23 @@ export function AssistantWidget() {
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                aria-label="Attach file"
-                title="Attach a file"
+                aria-label="Attach file from device"
+                title="Attach from this device"
                 className="h-9 w-9 shrink-0 rounded-lg border text-slate-600 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
               >
                 <Paperclip className="h-4 w-4" />
               </button>
+              {pickerConfigured() && (
+                <button
+                  onClick={pickFromDrive}
+                  disabled={uploading}
+                  aria-label="Attach from Google Drive"
+                  title="Attach from Google Drive"
+                  className="h-9 w-9 shrink-0 rounded-lg border text-slate-600 flex items-center justify-center disabled:opacity-40 hover:bg-slate-50"
+                >
+                  <HardDrive className="h-4 w-4" />
+                </button>
+              )}
               <textarea
                 ref={inputRef}
                 value={input}
