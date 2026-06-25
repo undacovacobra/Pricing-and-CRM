@@ -6,6 +6,47 @@
 // changes. Executors return human-readable strings — the model reads them back.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { APP_TIME_ZONE, formatTime } from "@/components/calendar/eventStyles";
+
+// Renders a UTC ISO timestamp as "YYYY-MM-DD h:mm AM/PM" in the business's
+// local timezone — never raw-slice a UTC string, it silently shows UTC.
+function formatLocal(iso: string): string {
+  const dayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+  return `${dayKey} ${formatTime(iso)}`;
+}
+
+// Resolves what UTC instant corresponds to a given wall-clock time
+// (YYYY-MM-DD HH:mm:ss) in the business's timezone, accounting for DST.
+function zonedToUtcIso(dateStr: string, time: string, tz: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, mi, s] = time.split(":").map(Number);
+  const utcGuess = Date.UTC(y, m - 1, d, h, mi, s ?? 0);
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(utcGuess)).reduce((acc: Record<string, string>, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const asUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second),
+  );
+  const offset = asUtc - utcGuess;
+  return new Date(utcGuess - offset).toISOString();
+}
 
 // Provider-neutral JSON-schema-ish shape for a tool's parameters.
 interface ToolSchema {
@@ -282,7 +323,7 @@ async function getJobDetails(supabase: SupabaseClient, input: Json): Promise<str
   }
   if (events?.length) {
     lines.push("Upcoming appointments:");
-    events.forEach((e) => lines.push(`  · ${e.event_type}: ${e.title} on ${String(e.start_time).replace("T", " ").slice(0, 16)}`));
+    events.forEach((e) => lines.push(`  · ${e.event_type}: ${e.title} on ${formatLocal(e.start_time as string)}`));
   }
   return lines.join("\n");
 }
@@ -314,10 +355,15 @@ async function searchCustomers(supabase: SupabaseClient, input: Json): Promise<s
 }
 
 async function listAppointments(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {
-  const from = (input.from as string | undefined) || new Date().toISOString().slice(0, 10);
-  const to = (input.to as string | undefined) || new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-  const fromIso = new Date(`${from}T00:00:00`).toISOString();
-  const toIso = new Date(`${to}T23:59:59`).toISOString();
+  const todayLocal = new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const from = (input.from as string | undefined) || todayLocal;
+  const to =
+    (input.to as string | undefined) ||
+    new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+      new Date(Date.now() + 14 * 86400000),
+    );
+  const fromIso = zonedToUtcIso(from, "00:00:00", APP_TIME_ZONE);
+  const toIso = zonedToUtcIso(to, "23:59:59", APP_TIME_ZONE);
 
   let q = supabase
     .from("calendar_events")
@@ -336,7 +382,7 @@ async function listAppointments(supabase: SupabaseClient, input: Json, ctx: Assi
       const cust = e.customer as { first_name?: string; last_name?: string } | null;
       const job = e.job as { title?: string } | null;
       const link = job?.title ? ` · job: ${job.title}` : cust ? ` · ${`${cust.first_name ?? ""} ${cust.last_name ?? ""}`.trim()}` : "";
-      return `- ${String(e.start_time).replace("T", " ").slice(0, 16)} ${e.event_type}: ${e.title} (${personLabel(e.assigned_to)})${e.location ? ` @ ${e.location}` : ""}${link}`;
+      return `- ${formatLocal(e.start_time as string)} ${e.event_type}: ${e.title} (${personLabel(e.assigned_to)})${e.location ? ` @ ${e.location}` : ""}${link}`;
     })
     .join("\n");
 }
@@ -390,7 +436,7 @@ async function createAppointment(supabase: SupabaseClient, input: Json, ctx: Ass
     .select("id, start_time")
     .single();
   if (error) return `Could not create the appointment: ${error.message}`;
-  return `Created ${eventType} "${title}" for ${personLabel(resolveRole(input.person as string, ctx))} on ${String(data.start_time).replace("T", " ").slice(0, 16)}. [${data.id}]`;
+  return `Created ${eventType} "${title}" for ${personLabel(resolveRole(input.person as string, ctx))} on ${formatLocal(data.start_time as string)}. [${data.id}]`;
 }
 
 async function addJobNote(supabase: SupabaseClient, input: Json, ctx: AssistantContext): Promise<string> {

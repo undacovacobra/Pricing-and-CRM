@@ -3,6 +3,7 @@ import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
 import { GEMINI_TOOL_DECLARATIONS, executeAssistantTool, type AssistantContext, type TeamRole } from "@/lib/assistant/tools";
+import { APP_TIME_ZONE } from "@/components/calendar/eventStyles";
 
 export const maxDuration = 120;
 
@@ -22,10 +23,16 @@ interface Content {
 
 function systemPrompt(ctx: AssistantContext): string {
   const now = new Date();
+  const localNow = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(now);
   return [
     "You are the in-app assistant for Coastal Edge Cabinetry and Design, a small kitchen cabinet & countertop business run by Travis (the owner) and Carol (the designer).",
     `You are talking to ${ctx.name} (role: ${ctx.role === "owner" ? "owner / Travis" : "designer / Carol"}). When they say "me" or "my", they mean themselves.`,
-    `The current date and time is ${now.toString()} (ISO: ${now.toISOString()}). Use this to resolve "today", "tomorrow", "next week", etc.`,
+    `The business operates in the ${APP_TIME_ZONE} timezone. The current date and time there is ${localNow} (ISO instant: ${now.toISOString()}). Use this — in ${APP_TIME_ZONE} — to resolve "today", "tomorrow", "next week", etc.`,
+    `When you call create_appointment, give start_time as an ISO 8601 datetime with an explicit UTC offset for ${APP_TIME_ZONE} (e.g. -04:00 during daylight time, -05:00 during standard time) — never a bare datetime with no offset.`,
     "",
     "You can look up jobs, customers, calendar appointments, and designer commissions, and you can take two actions: create calendar appointments and add notes to jobs.",
     "",
@@ -35,7 +42,7 @@ function systemPrompt(ctx: AssistantContext): string {
     "- To act on a named customer or job, first look up its id with search_customers / search_jobs, then pass that id to the action tool so it links correctly.",
     "- Before creating an appointment or adding a note, make sure you have what you need (for an appointment: a clear title, a specific date AND time, and who it's for). If something essential is missing or ambiguous, ask a brief clarifying question instead of guessing.",
     "- After taking an action, confirm what you did in one short sentence.",
-    "- Interpret bare times as the user's local time.",
+    `- Interpret bare times the user mentions as ${APP_TIME_ZONE} local time.`,
   ].join("\n");
 }
 
