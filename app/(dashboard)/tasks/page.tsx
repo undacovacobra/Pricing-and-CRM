@@ -9,19 +9,20 @@ export default async function TasksPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const defaultRole = roleFromEmail(user?.email);
 
-  const [{ data: open }, { data: done }] = await Promise.all([
+  const [{ data: open }, { data: done }, { data: jobs }] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id, title, description, due_date, assigned_to, status, job_id, job:jobs(title)")
+      .select("id, title, description, due_date, due_time, assigned_to, status, job_id, job:jobs(title)")
       .eq("status", "open")
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true }),
     supabase
       .from("tasks")
-      .select("id, title, description, due_date, assigned_to, status, job_id, job:jobs(title)")
+      .select("id, title, description, due_date, due_time, assigned_to, status, job_id, job:jobs(title)")
       .eq("status", "done")
       .order("completed_at", { ascending: false })
       .limit(20),
+    supabase.from("jobs").select("id, title").order("updated_at", { ascending: false }),
   ]);
 
   const openTasks = (open ?? []) as unknown as TaskRow[];
@@ -40,7 +41,7 @@ export default async function TasksPage() {
         </div>
       </div>
 
-      <AddTaskForm defaultRole={defaultRole} />
+      <AddTaskForm defaultRole={defaultRole} jobs={(jobs ?? []) as { id: string; title: string }[]} />
 
       {openTasks.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">

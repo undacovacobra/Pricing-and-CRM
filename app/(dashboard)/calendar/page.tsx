@@ -5,6 +5,9 @@ import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { DayDetailPanel } from "@/components/calendar/DayDetailPanel";
 import { customerName } from "@/lib/utils";
 import { localDayKey } from "@/components/calendar/eventStyles";
+import { CalendarTasks } from "@/components/tasks/CalendarTasks";
+import { roleFromEmail } from "@/lib/tasks/shared";
+import type { TaskRow } from "@/components/tasks/TaskItem";
 import { Plus, List } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
@@ -54,6 +57,18 @@ export default async function CalendarPage({
     customerLabels[c.id] = customerName(c) + (c.city ? ` — ${c.city}` : "");
   }
 
+  const [{ data: { user } }, { data: openTasks }, { data: jobs }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("tasks")
+      .select("id, title, description, due_date, due_time, assigned_to, status, job_id, job:jobs(title)")
+      .eq("status", "open")
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+    supabase.from("jobs").select("id, title").order("updated_at", { ascending: false }),
+  ]);
+  const defaultRole = roleFromEmail(user?.email);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -75,6 +90,12 @@ export default async function CalendarPage({
       <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} selectedDay={day} />
 
       {day && <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />}
+
+      <CalendarTasks
+        tasks={(openTasks ?? []) as unknown as TaskRow[]}
+        defaultRole={defaultRole}
+        jobs={(jobs ?? []) as { id: string; title: string }[]}
+      />
     </div>
   );
 }

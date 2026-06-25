@@ -11,28 +11,37 @@ export interface TaskRow {
   title: string;
   description: string | null;
   due_date: string | null;
+  due_time?: string | null;
   assigned_to: string;
   status: string;
   job_id: string | null;
   job?: { title: string } | null;
 }
 
-function dueLabel(due: string | null): { text: string; tone: string } {
+function prettyTime(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function dueLabel(due: string | null, time?: string | null): { text: string; tone: string } {
   if (!due) return { text: "No due date", tone: "text-slate-400" };
   // Compare as plain calendar dates (the due date has no time).
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
   const d = new Date(`${due}T12:00:00`);
   const pretty = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (due < today) return { text: `Overdue · ${pretty}`, tone: "text-red-600 font-medium" };
-  if (due === today) return { text: "Due today", tone: "text-amber-600 font-medium" };
-  return { text: `Due ${pretty}`, tone: "text-slate-500" };
+  const at = time && /^\d{2}:\d{2}$/.test(time) ? ` at ${prettyTime(time)}` : "";
+  if (due < today) return { text: `Overdue · ${pretty}${at}`, tone: "text-red-600 font-medium" };
+  if (due === today) return { text: `Due today${at}`, tone: "text-amber-600 font-medium" };
+  return { text: `Due ${pretty}${at}`, tone: "text-slate-500" };
 }
 
 export function TaskItem({ task, showJob = true }: { task: TaskRow; showJob?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const done = task.status === "done";
-  const due = dueLabel(task.due_date);
+  const due = dueLabel(task.due_date, task.due_time);
 
   function run(fn: () => Promise<unknown>) {
     startTransition(async () => {

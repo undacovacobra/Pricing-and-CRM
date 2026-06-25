@@ -27,8 +27,34 @@ export function normalizeRole(value: string | null | undefined, fallback: TaskRo
   return fallback;
 }
 
-// A task's calendar entry sits at 1pm UTC on the due date — that's 8–9am in the
-// business's Eastern timezone, i.e. the same calendar day, at a sane morning hour.
-export function taskCalendarStart(dueDate: string): string {
+const APP_TIME_ZONE = "America/New_York";
+
+// Converts a wall-clock date+time in the business's timezone to a UTC ISO
+// instant, accounting for DST.
+export function zonedToUtcIso(dateStr: string, time: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const utcGuess = Date.UTC(y, m - 1, d, h, mi, 0);
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: APP_TIME_ZONE,
+    hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const parts = dtf.formatToParts(new Date(utcGuess)).reduce((acc: Record<string, string>, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {});
+  const asUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second),
+  );
+  return new Date(utcGuess - (asUtc - utcGuess)).toISOString();
+}
+
+// Where a task's calendar entry sits. With a specific time, that exact Eastern
+// time; otherwise 1pm UTC (~8–9am Eastern — same calendar day, sane morning hour).
+export function taskCalendarStart(dueDate: string, dueTime?: string | null): string {
+  if (dueTime && /^\d{2}:\d{2}$/.test(dueTime)) return zonedToUtcIso(dueDate, dueTime);
   return `${dueDate}T13:00:00.000Z`;
 }

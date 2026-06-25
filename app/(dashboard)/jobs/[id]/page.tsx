@@ -75,7 +75,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.auth.getUser(),
     supabase
       .from("tasks")
-      .select("id, title, description, due_date, assigned_to, status, job_id")
+      .select("id, title, description, due_date, due_time, assigned_to, status, job_id")
       .eq("job_id", id)
       .order("status", { ascending: true })
       .order("due_date", { ascending: true, nullsFirst: false }),

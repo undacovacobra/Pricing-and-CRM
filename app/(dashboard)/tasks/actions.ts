@@ -13,6 +13,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string | null;
   due_date?: string | null;
+  due_time?: string | null;
   assigned_to?: string | null;
   job_id?: string | null;
 }
@@ -25,6 +26,7 @@ export async function createTask(input: CreateTaskInput): Promise<{ ok: boolean;
   const { role } = await currentRole();
   const assigned = normalizeRole(input.assigned_to, role);
   const dueDate = input.due_date || null;
+  const dueTime = input.due_time && /^\d{2}:\d{2}$/.test(input.due_time) ? input.due_time : null;
 
   const { data: task, error } = await supabase
     .from("tasks")
@@ -32,6 +34,7 @@ export async function createTask(input: CreateTaskInput): Promise<{ ok: boolean;
       title,
       description: input.description?.trim() || null,
       due_date: dueDate,
+      due_time: dueTime,
       assigned_to: assigned,
       job_id: input.job_id || null,
       status: "open",
@@ -50,7 +53,7 @@ export async function createTask(input: CreateTaskInput): Promise<{ ok: boolean;
         event_type: "task",
         assigned_to: assigned,
         job_id: input.job_id || null,
-        start_time: taskCalendarStart(dueDate),
+        start_time: taskCalendarStart(dueDate, dueTime),
         status: "scheduled",
         notes: input.description?.trim() || null,
       })
