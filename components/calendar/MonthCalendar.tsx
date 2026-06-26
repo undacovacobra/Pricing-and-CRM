@@ -94,20 +94,22 @@ export function MonthCalendar({
           </div>
         ))}
         {cells.map((cell) => {
-          const visibleEvents = cell.events.slice(0, MAX_CHIPS_PER_DAY);
+          // When a day is selected, expand it in place: show every appointment
+          // (no truncation) and give the cell room to grow so you can read it all.
+          const visibleEvents = cell.isSelected ? cell.events : cell.events.slice(0, MAX_CHIPS_PER_DAY);
           const overflow = cell.events.length - visibleEvents.length;
           return (
             <Link
               key={cell.key}
-              href={`/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
-              className={`bg-white min-h-[88px] sm:min-h-[120px] p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
-                cell.isSelected ? "ring-2 ring-inset ring-slate-900" : ""
+              href={cell.isSelected ? `/calendar?month=${monthParam(monthDate)}` : `/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
+              className={`bg-white p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
+                cell.isSelected ? "min-h-[160px] ring-2 ring-inset ring-slate-900 z-10" : "min-h-[88px] sm:min-h-[120px]"
               } ${!cell.inCurrentMonth ? "opacity-40" : ""}`}
             >
               <span
-                className={`text-xs sm:text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full ${
-                  cell.isToday ? "bg-slate-900 text-white" : "text-slate-700"
-                }`}
+                className={`font-semibold flex items-center justify-center rounded-full ${
+                  cell.isSelected ? "text-sm sm:text-base w-7 h-7" : "text-xs sm:text-sm w-6 h-6"
+                } ${cell.isToday ? "bg-slate-900 text-white" : "text-slate-700"}`}
               >
                 {cell.date.getDate()}
               </span>
@@ -115,11 +117,13 @@ export function MonthCalendar({
                 {visibleEvents.map((event) => (
                   <div
                     key={event.id}
-                    className={`flex items-center gap-1 rounded px-1 py-0.5 text-[11px] sm:text-xs leading-tight truncate ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-700"}`}
+                    className={`flex items-center gap-1 rounded px-1 py-0.5 leading-tight ${
+                      cell.isSelected ? "text-xs sm:text-sm" : "text-[11px] sm:text-xs truncate"
+                    } ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-700"}`}
                   >
                     <span className={`h-2 w-2 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
-                    <span className="truncate">
-                      <span className="hidden sm:inline font-semibold">{formatTime(event.start_time)} </span>
+                    <span className={cell.isSelected ? "" : "truncate"}>
+                      <span className={`font-semibold ${cell.isSelected ? "" : "hidden sm:inline"}`}>{formatTime(event.start_time)} </span>
                       {event.title}
                     </span>
                   </div>
