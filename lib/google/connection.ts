@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { refreshAccessToken } from "./drive";
+import { refreshAccessToken, scopeHasDriveRead } from "./drive";
 
 export interface GoogleConnectionStatus {
   connected: boolean;
   email: string | null;
+  // True once the connection has Drive read access (needed for Drive → CRM sync).
+  readAccess: boolean;
 }
 
 // Reads the current user's stored Google connection.
@@ -11,9 +13,13 @@ export async function getGoogleConnectionStatus(): Promise<GoogleConnectionStatu
   const supabase = await createClient();
   const { data } = await supabase
     .from("google_connections")
-    .select("google_email")
+    .select("google_email, scope")
     .maybeSingle();
-  return { connected: !!data, email: data?.google_email ?? null };
+  return {
+    connected: !!data,
+    email: data?.google_email ?? null,
+    readAccess: scopeHasDriveRead(data?.scope),
+  };
 }
 
 // Returns a usable access token for the current user, refreshing it if expired.

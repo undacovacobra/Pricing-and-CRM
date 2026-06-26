@@ -25,6 +25,8 @@ import {
   uploadAsGoogleSheet,
   deleteDriveFile,
   refreshAccessToken,
+  listDriveFolderChildren,
+  downloadDriveFile,
 } from "@/lib/google/drive";
 
 const ROOT_NAME = "Coastal Edge CRM Backup";
@@ -342,6 +344,85 @@ export async function backupJob(
   }
 
   return copied;
+}
+
+// ---- Reverse sync: Drive -> CRM ---------------------------------------------
+
+// True if this Drive file id is already tracked in backup_map — meaning either
+// the app created it (a backup copy) or we already imported it. Either way we
+// must not import it, which is what keeps the two folders in sync without loops
+// or duplicates.
+async function isKnownDriveId(admin: SupabaseClient, driveId: string): Promise<boolean> {
+  const { data } = await admin.from("backup_map").select("key").eq("drive_id", driveId).limit(1).maybeSingle();
+  return !!data;
+}
+
+// Pulls any file a user dropped into a job's Drive folder back into that job's
+// CRM attachments. Skips folders, app-created backup copies, and anything already
+// imported. Returns the number of new files imported this run.
+export async function importJobDriveFiles(
+  admin: SupabaseClient,
+  token: string,
+  jobId: string,
+): Promise<number> {
+  const folderId = await getMapped(admin, `job:${jobId}`);
+  if (!folderId) return 0;
+
+  let children;
+  try {
+    children = await listDriveFolderChildren(token, folderId);
+  } catch {
+    // Most likely the owner hasn't re-connected with read access yet — skip quietly.
+    return 0;
+  }
+
+  let imported = 0;
+  for (const child of children) {
+    if (child.mimeType === "application/vnd.google-apps.folder") continue;
+    if (await isKnownDriveId(admin, child.id)) continue;
+
+    let dl;
+    try {
+      dl = await downloadDriveFile(token, child.id, child.mimeType);
+    } catch {
+      continue;
+    }
+
+    let fileName = child.name;
+    if (dl.extension && !fileName.toLowerCase().endsWith(dl.extension)) fileName += dl.extension;
+
+    // Drive file ids are globally unique, so they make a collision-free storage path.
+    const path = `${jobId}/drive-import/${child.id}-${safeName(fileName)}`;
+    const { error: upErr } = await admin.storage
+      .from("job-attachments")
+      .upload(path, new Uint8Array(dl.bytes), { contentType: dl.contentType, upsert: false });
+    if (upErr) continue;
+
+    const { error: insErr } = await admin.from("job_attachments").insert({
+      job_id:       jobId,
+      storage_path: path,
+      file_name:    fileName,
+    });
+    if (insErr) continue;
+
+    // Point this storage path at the EXISTING Drive file so the outgoing backup
+    // pass treats it as already-mirrored and never uploads a duplicate copy.
+    await setMapped(admin, `file:job-attachments/${path}`, child.id, fileName);
+    imported++;
+  }
+
+  return imported;
+}
+
+// Reverse-syncs every job that has a Drive folder. Run before backupEverything so
+// the dedupe mapping is in place before the outgoing pass scans attachments.
+export async function importEverythingFromDrive(admin: SupabaseClient, token: string): Promise<number> {
+  const { data: jobs } = await admin.from("jobs").select("id");
+  let imported = 0;
+  for (const j of jobs ?? []) {
+    imported += await importJobDriveFiles(admin, token, j.id as string);
+  }
+  return imported;
 }
 
 // ---- Contacts backup --------------------------------------------------------

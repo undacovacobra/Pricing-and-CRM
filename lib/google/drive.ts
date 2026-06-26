@@ -5,11 +5,21 @@
 //   GOOGLE_CLIENT_ID
 //   GOOGLE_CLIENT_SECRET
 //
-// Scope: drive.file — the app can create and manage only the files/folders it
-// creates. This is the least-privilege scope for "create a folder per job and
-// upload into it" and does not require Google's restricted-scope verification.
+// Scopes:
+//   drive.file     — create/manage only the files/folders the app makes (backup writes)
+//   drive.readonly — read files the user adds by hand (Drive → CRM reverse sync)
+// drive.readonly is a "restricted" scope; for this small internal team the Google
+// project stays in Testing mode, so it works without formal verification (users
+// just click through an "unverified app" notice when re-connecting).
 
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const GOOGLE_DRIVE_READ_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+
+// True if a stored connection's scope string already includes read access — used
+// to decide whether to nudge the user to re-connect for two-way sync.
+export function scopeHasDriveRead(scope: string | null | undefined): boolean {
+  return typeof scope === "string" && scope.includes("drive.readonly");
+}
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -29,7 +39,7 @@ export function buildConsentUrl(origin: string, state: string): string {
     client_id:     process.env.GOOGLE_CLIENT_ID ?? "",
     redirect_uri:  redirectUri(origin),
     response_type: "code",
-    scope:         `${GOOGLE_DRIVE_SCOPE} https://www.googleapis.com/auth/userinfo.email`,
+    scope:         `${GOOGLE_DRIVE_SCOPE} ${GOOGLE_DRIVE_READ_SCOPE} https://www.googleapis.com/auth/userinfo.email`,
     access_type:   "offline",
     prompt:        "consent",
     include_granted_scopes: "true",
@@ -256,6 +266,37 @@ export async function uploadAsGoogleSheet(
   const file = await res.json();
   await shareWithAnyone(accessToken, file.id).catch(() => {});
   return file;
+}
+
+export interface DriveChild {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedTime?: string;
+}
+
+// Lists the non-trashed children directly inside a folder. Requires drive.readonly
+// to see files the app did not create (i.e. ones a user added by hand). Pages
+// through results so large job folders are fully covered.
+export async function listDriveFolderChildren(accessToken: string, folderId: string): Promise<DriveChild[]> {
+  const out: DriveChild[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: "nextPageToken, files(id, name, mimeType, modifiedTime)",
+      pageSize: "1000",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error(`Drive list failed: ${await res.text()}`);
+    const data = (await res.json()) as { files?: DriveChild[]; nextPageToken?: string };
+    for (const f of data.files ?? []) out.push(f);
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return out;
 }
 
 // Deletes a Drive file/folder the app created. Ignores 404 (already gone).

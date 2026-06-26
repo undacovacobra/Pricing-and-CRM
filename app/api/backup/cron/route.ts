@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
-import { backupEverything, getOwnerAccessToken, recordRun } from "@/lib/backup/engine";
+import { backupEverything, importEverythingFromDrive, getOwnerAccessToken, recordRun } from "@/lib/backup/engine";
 
 export const maxDuration = 300;
 
@@ -27,9 +27,11 @@ async function run(request: NextRequest) {
   }
 
   try {
+    // Pull manually-added Drive files into the CRM first, then mirror everything out.
+    const imported = await importEverythingFromDrive(admin, token);
     const result = await backupEverything(admin, token);
-    await recordRun(admin, "nightly", "success", `Backed up ${result.jobs} jobs, ${result.files} new files, ${result.contacts} contacts, ${result.calendarEvents} calendar events, ${result.commissions} commissions.`, result.jobs, result.files);
-    return NextResponse.json({ ok: true, ...result });
+    await recordRun(admin, "nightly", "success", `Imported ${imported} files from Drive; backed up ${result.jobs} jobs, ${result.files} new files, ${result.contacts} contacts, ${result.calendarEvents} calendar events, ${result.commissions} commissions.`, result.jobs, result.files);
+    return NextResponse.json({ ok: true, imported, ...result });
   } catch (e) {
     await recordRun(admin, "nightly", "error", String(e));
     return NextResponse.json({ error: "backup_failed", detail: String(e) }, { status: 502 });

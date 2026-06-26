@@ -27,7 +27,7 @@ export default async function SettingsPage({
   const { data: settings } = await supabase.from("app_settings").select("*").single();
 
   const configured = googleConfigured();
-  const status = configured ? await getGoogleConnectionStatus() : { connected: false, email: null };
+  const status = configured ? await getGoogleConnectionStatus() : { connected: false, email: null, readAccess: false };
   const { google } = await searchParams;
   const banner = google ? BANNERS[google] : undefined;
 
@@ -124,6 +124,7 @@ export default async function SettingsPage({
       <BackupCard
         serviceConfigured={adminConfigured()}
         driveConnected={status.connected}
+        driveReadAccess={status.readAccess}
         lastRun={lastRun ?? null}
       />
     </div>
