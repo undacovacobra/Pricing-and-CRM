@@ -8,8 +8,12 @@ import { localDayKey } from "@/components/calendar/eventStyles";
 import { CalendarTasks } from "@/components/tasks/CalendarTasks";
 import { roleFromEmail } from "@/lib/tasks/shared";
 import type { TaskRow } from "@/components/tasks/TaskItem";
-import { Plus, List } from "lucide-react";
+import { Plus, List, X } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
+
+function monthParam(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 function parseMonthParam(month?: string): Date {
   if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -89,7 +93,26 @@ export default async function CalendarPage({
 
       <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} selectedDay={day} />
 
-      {day && <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />}
+      {day && (
+        <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 sm:p-6">
+          {/* Backdrop — clicking it closes the panel by dropping the ?day= param. */}
+          <Link
+            href={`/calendar?month=${monthParam(monthDate)}`}
+            aria-label="Close"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+          />
+          <div className="relative z-10 w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-white shadow-2xl mt-16 sm:mt-0">
+            <Link
+              href={`/calendar?month=${monthParam(monthDate)}`}
+              aria-label="Close"
+              className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X className="h-5 w-5" />
+            </Link>
+            <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />
+          </div>
+        </div>
+      )}
 
       <CalendarTasks
         tasks={(openTasks ?? []) as unknown as TaskRow[]}

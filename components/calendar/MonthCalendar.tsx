@@ -94,36 +94,37 @@ export function MonthCalendar({
           </div>
         ))}
         {cells.map((cell) => {
-          // When a day is selected, expand it in place: show every appointment
-          // (no truncation) and give the cell room to grow so you can read it all.
-          const visibleEvents = cell.isSelected ? cell.events : cell.events.slice(0, MAX_CHIPS_PER_DAY);
+          // Tapping a day opens an overlay panel (rendered by the page) via the
+          // ?day= param — the grid itself stays a fixed, tidy shape. Cells show a
+          // few chips with a "+N more" hint so you know there's more to see.
+          const visibleEvents = cell.events.slice(0, MAX_CHIPS_PER_DAY);
           const overflow = cell.events.length - visibleEvents.length;
           return (
             <Link
               key={cell.key}
               href={cell.isSelected ? `/calendar?month=${monthParam(monthDate)}` : `/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
-              className={`bg-white p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
-                cell.isSelected ? "max-h-[160px] sm:max-h-[220px] ring-2 ring-inset ring-slate-900 z-10" : "min-h-[88px] sm:min-h-[120px]"
+              className={`bg-white p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors min-h-[88px] sm:min-h-[120px] ${
+                cell.isSelected ? "ring-2 ring-inset ring-slate-900 z-10" : ""
               } ${!cell.inCurrentMonth ? "opacity-40" : ""}`}
             >
               <span
-                className={`font-semibold flex items-center justify-center rounded-full ${
-                  cell.isSelected ? "text-sm sm:text-base w-7 h-7" : "text-xs sm:text-sm w-6 h-6"
-                } ${cell.isToday ? "bg-slate-900 text-white" : "text-slate-700"}`}
+                className={`font-semibold flex items-center justify-center rounded-full text-xs sm:text-sm w-6 h-6 ${
+                  cell.isToday ? "bg-slate-900 text-white" : "text-slate-700"
+                }`}
               >
                 {cell.date.getDate()}
               </span>
-              <div className={`space-y-1 ${cell.isSelected ? "overflow-y-auto" : "overflow-hidden"}`}>
+              <div className="space-y-1 overflow-hidden">
                 {visibleEvents.map((event) => (
                   <div
                     key={event.id}
-                    className={`flex items-center gap-1 rounded px-1 py-0.5 leading-tight ${
-                      cell.isSelected ? "text-xs sm:text-sm" : "text-[11px] sm:text-xs truncate"
-                    } ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-700"}`}
+                    className={`flex items-center gap-1 rounded px-1 py-0.5 leading-tight text-[11px] sm:text-xs truncate ${
+                      TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-700"
+                    }`}
                   >
                     <span className={`h-2 w-2 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
-                    <span className={cell.isSelected ? "" : "truncate"}>
-                      <span className={`font-semibold ${cell.isSelected ? "" : "hidden sm:inline"}`}>{formatTime(event.start_time)} </span>
+                    <span className="truncate">
+                      <span className="font-semibold hidden sm:inline">{formatTime(event.start_time)} </span>
                       {event.title}
                     </span>
                   </div>
