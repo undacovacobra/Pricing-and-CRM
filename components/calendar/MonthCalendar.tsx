@@ -1,6 +1,12 @@
+"use client";
+import { useState } from "react";
 import Link from "next/link";
 import { ASSIGNEE_DOT_COLORS, assigneeKind, formatTime, localDayKey, TYPE_COLORS, TYPE_DOT_COLORS, TYPE_LABELS } from "@/components/calendar/eventStyles";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { DayDetailPanel } from "@/components/calendar/DayDetailPanel";
+import { Plus } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -17,12 +23,14 @@ function monthParam(d: Date): string {
 export function MonthCalendar({
   monthDate,
   eventsByDay,
-  selectedDay,
+  customerLabels,
 }: {
   monthDate: Date;
   eventsByDay: Record<string, CalendarEvent[]>;
-  selectedDay?: string;
+  customerLabels: Record<string, string>;
 }) {
+  const [openDay, setOpenDay] = useState<string | null>(null);
+
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const firstOfMonth = new Date(year, month, 1);
@@ -40,10 +48,13 @@ export function MonthCalendar({
       key,
       inCurrentMonth: date.getMonth() === month,
       isToday: key === todayKey,
-      isSelected: key === selectedDay,
       events: (eventsByDay[key] ?? []).slice().sort((a, b) => a.start_time.localeCompare(b.start_time)),
     };
   });
+
+  const openHeading = openDay
+    ? new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date(`${openDay}T00:00:00`))
+    : "";
 
   return (
     <div className="space-y-3">
@@ -97,12 +108,13 @@ export function MonthCalendar({
           const visibleEvents = cell.events.slice(0, MAX_CHIPS_PER_DAY);
           const overflow = cell.events.length - visibleEvents.length;
           return (
-            <Link
+            <button
               key={cell.key}
-              href={`/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
-              className={`bg-white min-h-[88px] sm:min-h-[120px] p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
-                cell.isSelected ? "ring-2 ring-inset ring-slate-900" : ""
-              } ${!cell.inCurrentMonth ? "opacity-40" : ""}`}
+              type="button"
+              onClick={() => setOpenDay(cell.key)}
+              className={`bg-white min-h-[88px] sm:min-h-[120px] p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors text-left ${
+                !cell.inCurrentMonth ? "opacity-40" : ""
+              }`}
             >
               <span
                 className={`text-xs sm:text-sm font-semibold w-6 h-6 flex items-center justify-center rounded-full ${
@@ -111,7 +123,7 @@ export function MonthCalendar({
               >
                 {cell.date.getDate()}
               </span>
-              <div className="space-y-1 overflow-hidden">
+              <div className="space-y-1 overflow-hidden w-full">
                 {visibleEvents.map((event) => (
                   <div
                     key={event.id}
@@ -128,10 +140,33 @@ export function MonthCalendar({
                   <p className="text-[11px] sm:text-xs font-medium text-muted-foreground pl-1">+{overflow} more</p>
                 )}
               </div>
-            </Link>
+            </button>
           );
         })}
       </div>
+
+      <Dialog open={openDay !== null} onOpenChange={(open) => !open && setOpenDay(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="flex flex-row items-center justify-between gap-2">
+            <DialogTitle className="text-base">{openHeading}</DialogTitle>
+            {openDay && (
+              <Button asChild size="sm">
+                <Link href={`/calendar/new?date=${openDay}`}>
+                  <Plus className="h-4 w-4" /> New
+                </Link>
+              </Button>
+            )}
+          </DialogHeader>
+          {openDay && (
+            <DayDetailPanel
+              dayKey={openDay}
+              events={(eventsByDay[openDay] ?? []).slice().sort((a, b) => a.start_time.localeCompare(b.start_time))}
+              customerLabels={customerLabels}
+              bare
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

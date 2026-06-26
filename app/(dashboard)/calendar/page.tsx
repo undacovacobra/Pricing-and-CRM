@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
-import { DayDetailPanel } from "@/components/calendar/DayDetailPanel";
 import { customerName } from "@/lib/utils";
 import { localDayKey } from "@/components/calendar/eventStyles";
 import { CalendarTasks } from "@/components/tasks/CalendarTasks";
@@ -23,9 +22,9 @@ function parseMonthParam(month?: string): Date {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; day?: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
-  const { month, day } = await searchParams;
+  const { month } = await searchParams;
   const monthDate = parseMonthParam(month);
 
   const firstOfMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -87,9 +86,7 @@ export default async function CalendarPage({
         </div>
       </div>
 
-      <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} selectedDay={day} />
-
-      {day && <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />}
+      <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} customerLabels={customerLabels} />
 
       <CalendarTasks
         tasks={(openTasks ?? []) as unknown as TaskRow[]}
