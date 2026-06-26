@@ -91,28 +91,31 @@ export default async function CalendarPage({
         </div>
       </div>
 
-      <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} selectedDay={day} />
+      <div className="relative">
+        <MonthCalendar monthDate={monthDate} eventsByDay={eventsByDay} selectedDay={day} />
 
-      {day && (
-        <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 sm:p-6">
-          {/* Backdrop — clicking it closes the panel by dropping the ?day= param. */}
-          <Link
-            href={`/calendar?month=${monthParam(monthDate)}`}
-            aria-label="Close"
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-          />
-          <div className="relative z-10 w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-white shadow-2xl mt-16 sm:mt-0">
+        {day && (
+          <>
+            {/* Transparent click-away layer — closes the popover without dimming the page. */}
             <Link
               href={`/calendar?month=${monthParam(monthDate)}`}
               aria-label="Close"
-              className="absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-            >
-              <X className="h-5 w-5" />
-            </Link>
-            <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />
-          </div>
-        </div>
-      )}
+              className="fixed inset-0 z-40"
+            />
+            {/* Compact popover that floats over the calendar, just big enough to read the day. */}
+            <div className="absolute left-1/2 top-24 z-50 w-[min(22rem,calc(100%-1rem))] -translate-x-1/2 max-h-[60vh] overflow-y-auto rounded-xl bg-white shadow-2xl ring-1 ring-slate-200">
+              <Link
+                href={`/calendar?month=${monthParam(monthDate)}`}
+                aria-label="Close"
+                className="absolute right-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </Link>
+              <DayDetailPanel dayKey={day} events={eventsByDay[day] ?? []} customerLabels={customerLabels} />
+            </div>
+          </>
+        )}
+      </div>
 
       <CalendarTasks
         tasks={(openTasks ?? []) as unknown as TaskRow[]}
