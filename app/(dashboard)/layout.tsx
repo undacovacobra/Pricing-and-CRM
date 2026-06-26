@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : null;
 
   return (
-    <div className="min-h-screen bg-slate-50 relative">
+    <div className="min-h-screen bg-slate-50 relative overflow-x-hidden w-full max-w-full">
       {backgroundUrl && (
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-10 pointer-events-none"
@@ -27,8 +27,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="relative">
         <RegisterServiceWorker />
         <Sidebar userName={userName} />
-        <main className="md:ml-60 pb-20 md:pb-6">
-          <div className="max-w-7xl mx-auto px-4 py-6">
+        <main className="md:ml-60 pb-20 md:pb-6 overflow-x-hidden">
+          <div className="max-w-7xl mx-auto px-4 py-6 w-full min-w-0">
             {children}
           </div>
         </main>

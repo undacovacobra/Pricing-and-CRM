@@ -20,7 +20,7 @@ export function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t pb-[env(safe-area-inset-bottom)]">
       <div className="flex overflow-x-auto">
         {mobileNavItems.map(({ href, label, icon: Icon }) => {
           const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);

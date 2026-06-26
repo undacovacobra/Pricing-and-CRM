@@ -65,6 +65,13 @@
   * {
     @apply border-border;
   }
+  html, body {
+    /* Lock the app to vertical scrolling only. Without this, any element that
+     * runs wider than the screen lets the whole page scroll sideways — and on
+     * iOS PWAs that also knocks the fixed bottom nav out of view. */
+    overflow-x: hidden;
+    max-width: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: "Recoleta", "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
