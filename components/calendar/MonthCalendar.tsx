@@ -103,7 +103,7 @@ export function MonthCalendar({
               key={cell.key}
               href={cell.isSelected ? `/calendar?month=${monthParam(monthDate)}` : `/calendar?month=${monthParam(monthDate)}&day=${cell.key}`}
               className={`bg-white p-1 sm:p-1.5 flex flex-col gap-1 hover:bg-slate-50 transition-colors ${
-                cell.isSelected ? "min-h-[160px] ring-2 ring-inset ring-slate-900 z-10" : "min-h-[88px] sm:min-h-[120px]"
+                cell.isSelected ? "max-h-[160px] sm:max-h-[220px] ring-2 ring-inset ring-slate-900 z-10" : "min-h-[88px] sm:min-h-[120px]"
               } ${!cell.inCurrentMonth ? "opacity-40" : ""}`}
             >
               <span
@@ -113,7 +113,7 @@ export function MonthCalendar({
               >
                 {cell.date.getDate()}
               </span>
-              <div className="space-y-1 overflow-hidden">
+              <div className={`space-y-1 ${cell.isSelected ? "overflow-y-auto" : "overflow-hidden"}`}>
                 {visibleEvents.map((event) => (
                   <div
                     key={event.id}
