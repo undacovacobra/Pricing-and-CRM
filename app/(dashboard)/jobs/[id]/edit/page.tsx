@@ -2,15 +2,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { JobForm } from "@/components/jobs/JobForm";
+import { roleFromEmail } from "@/lib/tasks/shared";
 
 export default async function EditJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: job }, { data: customers }] = await Promise.all([
+  const [{ data: { user } }, { data: job }, { data: customers }] = await Promise.all([
+    supabase.auth.getUser(),
     supabase.from("jobs").select("*").eq("id", id).single(),
     supabase.from("customers").select("*").order("last_name"),
   ]);
+  const defaultRole = roleFromEmail(user?.email);
 
   if (!job) notFound();
 
@@ -22,7 +25,7 @@ export default async function EditJobPage({ params }: { params: Promise<{ id: st
         </Link>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Edit Job</h1>
       </div>
-      <JobForm job={job} customers={customers ?? []} />
+      <JobForm job={job} customers={customers ?? []} defaultRole={defaultRole} />
     </div>
   );
 }

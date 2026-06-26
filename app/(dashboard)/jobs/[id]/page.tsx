@@ -478,7 +478,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <AddNoteForm jobId={id} />
+              <AddNoteForm jobId={id} defaultRole={defaultRole} />
               {notes?.map((note) => (
                 <div key={note.id} className="border rounded-lg p-3 text-sm">
                   <div className="flex items-center justify-between mb-1">

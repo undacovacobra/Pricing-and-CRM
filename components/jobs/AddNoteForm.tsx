@@ -8,12 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Paperclip, X } from "lucide-react";
 
-export function AddNoteForm({ jobId }: { jobId: string }) {
+export function AddNoteForm({ jobId, defaultRole }: { jobId: string; defaultRole: "owner" | "designer" }) {
   const router = useRouter();
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [content, setContent] = useState("");
-  const [author, setAuthor] = useState("owner");
+  const [author, setAuthor] = useState(defaultRole);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -65,7 +65,7 @@ export function AddNoteForm({ jobId }: { jobId: string }) {
         </div>
       )}
       <div className="flex items-center gap-2">
-        <Select value={author} onValueChange={setAuthor}>
+        <Select value={author} onValueChange={(v) => setAuthor(v as "owner" | "designer")}>
           <SelectTrigger className="w-32 h-8 text-xs">
             <SelectValue />
           </SelectTrigger>

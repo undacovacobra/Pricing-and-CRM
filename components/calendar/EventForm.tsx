@@ -64,10 +64,12 @@ export function EventForm({
   event,
   customers,
   jobs,
+  defaultRole,
 }: {
   event?: CalendarEvent;
   customers: Customer[];
   jobs: (Job & { customerLabel: string })[];
+  defaultRole: "owner" | "designer";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,7 +82,7 @@ export function EventForm({
   const [title, setTitle] = useState(event?.title ?? "");
   const [customerId, setCustomerId] = useState(defaultCustomerId);
   const [jobId, setJobId] = useState(defaultJobId);
-  const [assignedKind, setAssignedKind] = useState<AssignedKind>(kindFromAssignedTo(event?.assigned_to ?? "owner"));
+  const [assignedKind, setAssignedKind] = useState<AssignedKind>(kindFromAssignedTo(event?.assigned_to ?? defaultRole));
   const [installerName, setInstallerName] = useState(
     event && kindFromAssignedTo(event.assigned_to) === "installer" ? event.assigned_to : "",
   );
@@ -186,7 +188,7 @@ export function EventForm({
         const whoLabel = assignedKind === "owner" ? "Travis" : assignedKind === "designer" ? "Carol" : assignedTo;
         await supabase.from("job_notes").insert({
           job_id:  jobId,
-          author:  "owner",
+          author:  defaultRole,
           content: `Calendar event scheduled: "${title.trim()}" on ${when} (${whoLabel})${finalLocation ? ` at ${finalLocation}` : ""}.`,
         });
         triggerBackup({ jobId });

@@ -33,7 +33,15 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }) {
+export function JobForm({
+  job,
+  customers,
+  defaultRole,
+}: {
+  job?: Job;
+  customers: Customer[];
+  defaultRole: "owner" | "designer";
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -55,14 +63,14 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
           estimated_value:    job.estimated_value?.toString() ?? "",
           start_date:         job.start_date ?? "",
           estimated_end_date: job.estimated_end_date ?? "",
-          assigned_to:        job.assigned_to ?? "owner",
+          assigned_to:        job.assigned_to ?? defaultRole,
           notes:              job.notes ?? "",
         }
       : {
           customer_id:        defaultCustomerId,
           parent_customer_id: "",
           stage:              "lead",
-          assigned_to:        "owner",
+          assigned_to:        defaultRole,
         },
   });
 
@@ -103,7 +111,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
       estimated_value:    values.estimated_value ? parseFloat(values.estimated_value) : null,
       start_date:         values.start_date || null,
       estimated_end_date: values.estimated_end_date || null,
-      assigned_to:        values.assigned_to || "owner",
+      assigned_to:        values.assigned_to || defaultRole,
       notes:              values.notes || null,
     };
 
@@ -208,7 +216,7 @@ export function JobForm({ job, customers }: { job?: Job; customers: Customer[] }
             </div>
             <div className="space-y-1.5">
               <Label>Assigned To</Label>
-              <Select value={watch("assigned_to") ?? "owner"} onValueChange={(v) => setValue("assigned_to", v)}>
+              <Select value={watch("assigned_to") ?? defaultRole} onValueChange={(v) => setValue("assigned_to", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

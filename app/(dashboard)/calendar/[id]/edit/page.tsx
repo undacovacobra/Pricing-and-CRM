@@ -4,16 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import { EventForm } from "@/components/calendar/EventForm";
 import { DeleteEventButton } from "@/components/calendar/DeleteEventButton";
 import { customerName } from "@/lib/utils";
+import { roleFromEmail } from "@/lib/tasks/shared";
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: event }, { data: customers }, { data: jobs }] = await Promise.all([
+  const [{ data: { user } }, { data: event }, { data: customers }, { data: jobs }] = await Promise.all([
+    supabase.auth.getUser(),
     supabase.from("calendar_events").select("*").eq("id", id).single(),
     supabase.from("customers").select("*").order("last_name", { ascending: true }),
     supabase.from("jobs").select("*, customer:customers!jobs_customer_id_fkey(first_name, last_name)").order("created_at", { ascending: false }),
   ]);
+  const defaultRole = roleFromEmail(user?.email);
 
   if (!event) notFound();
 
@@ -33,7 +36,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
         </div>
         <DeleteEventButton eventId={id} eventTitle={event.title} />
       </div>
-      <EventForm event={event} customers={customers ?? []} jobs={jobsWithLabel} />
+      <EventForm event={event} customers={customers ?? []} jobs={jobsWithLabel} defaultRole={defaultRole} />
     </div>
   );
 }

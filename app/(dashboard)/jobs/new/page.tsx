@@ -2,15 +2,17 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { JobForm } from "@/components/jobs/JobForm";
+import { roleFromEmail } from "@/lib/tasks/shared";
 
 async function NewJobContent() {
   const supabase = await createClient();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select("*")
-    .order("last_name", { ascending: true });
+  const [{ data: { user } }, { data: customers }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("customers").select("*").order("last_name", { ascending: true }),
+  ]);
+  const defaultRole = roleFromEmail(user?.email);
 
-  return <JobForm customers={customers ?? []} />;
+  return <JobForm customers={customers ?? []} defaultRole={defaultRole} />;
 }
 
 export default function NewJobPage() {
