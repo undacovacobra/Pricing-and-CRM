@@ -8,9 +8,9 @@
 // workspace that runs entirely from on-device data (IndexedDB) and lets the
 // user open cached jobs, draw, and save. Static assets are cached so that page
 // (and its scripts) load with no signal.
-// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v5
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v6
 
-const CACHE = "coastal-edge-v5";
+const CACHE = "coastal-edge-v6";
 
 // The offline workspace shell, pre-fetched on install so it's available the
 // first time the device goes offline — no warm-up browsing required.

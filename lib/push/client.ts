@@ -12,7 +12,22 @@ export function pushSupported(): boolean {
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
   try {
-    return await navigator.serviceWorker.register("/sw.js");
+    // If a new service worker takes control mid-session, reload once so the app
+    // runs the fresh build instead of a stale cached one. Only reload when there
+    // was already a controller (i.e. this is an update, not first install).
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController || refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    // Force an update check on every app open so new deploys are picked up
+    // promptly rather than whenever the browser happens to re-check sw.js.
+    reg.update().catch(() => {});
+    return reg;
   } catch {
     return null;
   }
