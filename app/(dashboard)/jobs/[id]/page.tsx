@@ -18,7 +18,7 @@ import { roleFromEmail } from "@/lib/tasks/shared";
 import type { TaskRow } from "@/components/tasks/TaskItem";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
-import { formatCurrency, formatDate, teamMemberName } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, teamMemberName } from "@/lib/utils";
 import { Pencil, Plus, FileText, Camera, MessageSquare, Package, Paperclip, FileSignature, FilePlus2, Calculator, CalendarDays, MapPin, PencilRuler } from "lucide-react";
 import type { JobStage, DocumentType, MaterialOrder, JobAttachment, ContractDocument, CalendarEvent, JobDrawing } from "@/lib/types/database";
 
@@ -238,7 +238,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                   <div className="p-3 border rounded-lg hover:bg-slate-50 transition-colors text-sm space-y-1">
                     <p className="font-medium">{event.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.start_time))}
+                      {formatDateTime(event.start_time)}
                       {" · "}
                       {teamMemberName(event.assigned_to)}
                     </p>
