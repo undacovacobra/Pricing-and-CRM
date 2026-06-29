@@ -33,7 +33,22 @@ const documentTypeLabels: Record<DocumentType, string> = {
   quote:        "Quote",
 };
 
-export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+// TEMPORARY diagnostic wrapper: surfaces the real server-render error on screen
+// (production normally redacts it to a generic message + digest). Remove once the
+// crashing job is diagnosed.
+export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
+  try {
+    return await renderJobDetail(props);
+  } catch (e) {
+    return (
+      <pre className="whitespace-pre-wrap break-words p-4 text-xs text-red-700 bg-red-50 rounded-lg border border-red-200">
+        {`JOB PAGE ERROR\n\n${String(e)}\n\n${(e instanceof Error && e.stack) || ""}`}
+      </pre>
+    );
+  }
+}
+
+async function renderJobDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
