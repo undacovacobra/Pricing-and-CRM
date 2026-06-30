@@ -33,22 +33,7 @@ const documentTypeLabels: Record<DocumentType, string> = {
   quote:        "Quote",
 };
 
-// TEMPORARY diagnostic wrapper: surfaces the real server-render error on screen
-// (production normally redacts it to a generic message + digest). Remove once the
-// crashing job is diagnosed.
-export default async function JobDetailPage(props: { params: Promise<{ id: string }> }) {
-  try {
-    return await renderJobDetail(props);
-  } catch (e) {
-    return (
-      <pre className="whitespace-pre-wrap break-words p-4 text-xs text-red-700 bg-red-50 rounded-lg border border-red-200">
-        {`JOB PAGE ERROR\n\n${String(e)}\n\n${(e instanceof Error && e.stack) || ""}`}
-      </pre>
-    );
-  }
-}
-
-async function renderJobDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
@@ -249,27 +234,26 @@ async function renderJobDetail({ params }: { params: Promise<{ id: string }> }) 
                 <p className="text-sm text-muted-foreground text-center py-4">No appointments scheduled.</p>
               )}
               {(events as CalendarEvent[] | null)?.map((event) => (
-                <Link key={event.id} href={`/calendar/${event.id}/edit`}>
-                  <div className="p-3 border rounded-lg hover:bg-slate-50 transition-colors text-sm space-y-1">
+                <div key={event.id} className="p-3 border rounded-lg hover:bg-slate-50 transition-colors text-sm space-y-1">
+                  <Link href={`/calendar/${event.id}/edit`} className="block">
                     <p className="font-medium">{event.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatDateTime(event.start_time)}
                       {" · "}
                       {teamMemberName(event.assigned_to)}
                     </p>
-                    {event.location && (
-                      <a
-                        href={mapsLink(event.location)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                      >
-                        <MapPin className="h-3 w-3 shrink-0" /> {event.location}
-                      </a>
-                    )}
-                  </div>
-                </Link>
+                  </Link>
+                  {event.location && (
+                    <a
+                      href={mapsLink(event.location)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    >
+                      <MapPin className="h-3 w-3 shrink-0" /> {event.location}
+                    </a>
+                  )}
+                </div>
               ))}
             </CardContent>
           </Card>
