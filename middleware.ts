@@ -52,6 +52,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Exclude API, Next internals, images, and the PWA files (manifest + service
+    // worker) — those must be publicly fetchable so the browser can install the
+    // app and pick up manifest shortcuts without an auth redirect.
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
