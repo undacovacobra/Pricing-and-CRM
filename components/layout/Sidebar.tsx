@@ -12,12 +12,14 @@ import {
   CalendarDays,
   MessageSquare,
   ListChecks,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/",             label: "Dashboard",   icon: LayoutDashboard },
+  { href: "/today",        label: "Today",       icon: Sun },
   { href: "/calendar",     label: "Calendar",    icon: CalendarDays },
   { href: "/tasks",        label: "Tasks",       icon: ListChecks },
   { href: "/chat",         label: "Chat",        icon: MessageSquare },

@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Briefcase, Receipt, Settings, Calculator, CalendarDays, MessageSquare, ListChecks } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, Receipt, Settings, Calculator, CalendarDays, MessageSquare, ListChecks, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mobileNavItems = [
   { href: "/",             label: "Home",     icon: LayoutDashboard },
+  { href: "/today",        label: "Today",    icon: Sun },
   { href: "/calendar",     label: "Calendar", icon: CalendarDays },
   { href: "/tasks",        label: "Tasks",    icon: ListChecks },
   { href: "/chat",         label: "Chat",     icon: MessageSquare },
