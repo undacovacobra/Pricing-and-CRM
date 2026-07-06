@@ -2,7 +2,7 @@
   "name": "Coastal Edge Cabinetry and Design",
   "short_name": "Coastal Edge",
   "description": "Pricing, CRM, calendar, and team chat for Coastal Edge Cabinetry and Design.",
-  "start_url": "/",
+  "start_url": "/today",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
