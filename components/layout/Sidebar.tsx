@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import type { AppRole } from "@/lib/auth/roles";
 
 const navItems = [
   { href: "/",             label: "Dashboard",   icon: LayoutDashboard },
@@ -30,10 +31,14 @@ const navItems = [
   { href: "/settings",     label: "Settings",    icon: Settings },
 ];
 
-export function Sidebar({ userName }: { userName: string }) {
+// Installers only get the day view, calendar, and tasks.
+const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks"]);
+
+export function Sidebar({ userName, role }: { userName: string; role: AppRole }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const items = role === "installer" ? navItems.filter((i) => INSTALLER_HREFS.has(i.href)) : navItems;
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -49,7 +54,7 @@ export function Sidebar({ userName }: { userName: string }) {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link

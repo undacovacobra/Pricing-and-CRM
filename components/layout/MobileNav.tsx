@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, Briefcase, Receipt, Settings, Calculator, CalendarDays, MessageSquare, ListChecks, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { AppRole } from "@/lib/auth/roles";
 
 const mobileNavItems = [
   { href: "/",             label: "Home",     icon: LayoutDashboard },
@@ -17,13 +18,16 @@ const mobileNavItems = [
   { href: "/settings",     label: "Settings", icon: Settings },
 ];
 
-export function MobileNav() {
+const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks"]);
+
+export function MobileNav({ role }: { role: AppRole }) {
   const pathname = usePathname();
+  const items = role === "installer" ? mobileNavItems.filter((i) => INSTALLER_HREFS.has(i.href)) : mobileNavItems;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t pb-[env(safe-area-inset-bottom)]">
       <div className="flex overflow-x-auto">
-        {mobileNavItems.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link

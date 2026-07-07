@@ -8,6 +8,8 @@ import { getGoogleConnectionStatus } from "@/lib/google/connection";
 import { googleConfigured } from "@/lib/google/drive";
 import { adminConfigured } from "@/lib/supabase/admin";
 import { BackupCard } from "@/components/settings/BackupCard";
+import { UsersCard } from "@/components/settings/UsersCard";
+import { roleFromUser } from "@/lib/auth/roles";
 
 const BANNERS: Record<string, { text: string; tone: "ok" | "warn" }> = {
   connected:       { text: "Google Drive connected.", tone: "ok" },
@@ -25,6 +27,8 @@ export default async function SettingsPage({
 }) {
   const supabase = await createClient();
   const { data: settings } = await supabase.from("app_settings").select("*").single();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isOwner = roleFromUser(user) === "owner";
 
   const configured = googleConfigured();
   const status = configured ? await getGoogleConnectionStatus() : { connected: false, email: null, readAccess: false };
@@ -120,6 +124,8 @@ export default async function SettingsPage({
           )}
         </CardContent>
       </Card>
+
+      {isOwner && <UsersCard />}
 
       <BackupCard
         serviceConfigured={adminConfigured()}

@@ -5,12 +5,14 @@ import { OfflineManager } from "@/components/offline/OfflineManager";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
+import { roleFromUser } from "@/lib/auth/roles";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: settings } = await supabase.from("app_settings").select("background_photo_path").single();
   const { data: { user } } = await supabase.auth.getUser();
-  const userName = userNameForEmail(user?.email);
+  const role = roleFromUser(user);
+  const userName = (user?.user_metadata?.display_name as string | undefined) || userNameForEmail(user?.email);
 
   const backgroundUrl = settings?.background_photo_path
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/branding/${settings.background_photo_path}`
@@ -26,14 +28,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
       )}
       <div className="relative">
         <RegisterServiceWorker />
-        <Sidebar userName={userName} />
+        <Sidebar userName={userName} role={role} />
         <main className="md:ml-60 pb-20 md:pb-6 overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 py-6 w-full min-w-0">
             {children}
           </div>
         </main>
-        <MobileNav />
-        <AssistantWidget />
+        <MobileNav role={role} />
+        {role !== "installer" && <AssistantWidget />}
         <OfflineManager />
       </div>
     </div>

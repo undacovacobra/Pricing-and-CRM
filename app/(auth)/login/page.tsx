@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { loginInputToEmail } from "@/lib/auth/roles";
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,10 +21,12 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
+    // Accept either an email or a plain username (mapped to a synthetic email).
+    const email = loginInputToEmail(loginId);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError(error.message);
+      setError("That username/email and password didn't match. Please try again.");
       setLoading(false);
       return;
     }
@@ -47,15 +50,16 @@ export default function LoginPage() {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="loginId">Username or email</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="loginId"
+                  type="text"
+                  placeholder="username or you@example.com"
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
                   required
-                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoComplete="username"
                 />
               </div>
               <div className="space-y-2">
