@@ -15,6 +15,21 @@ function monthParam(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// Enumerate every "YYYY-MM-DD" day key from start to end inclusive. Keys are
+// already local (America/New_York) date strings, so we step through them as
+// plain UTC-midnight dates to avoid any timezone drift.
+function eachDayKey(startKey: string, endKey: string): string[] {
+  const out: string[] = [];
+  let d = new Date(`${startKey}T00:00:00Z`);
+  const end = new Date(`${endKey}T00:00:00Z`);
+  let guard = 0;
+  while (d <= end && guard++ < 400) {
+    out.push(d.toISOString().slice(0, 10));
+    d = new Date(d.getTime() + 86400000);
+  }
+  return out;
+}
+
 function parseMonthParam(month?: string): Date {
   if (month && /^\d{4}-\d{2}$/.test(month)) {
     const [y, m] = month.split("-").map(Number);
@@ -37,18 +52,24 @@ export default async function CalendarPage({
   const gridEnd = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + 42);
 
   const supabase = await createClient();
+  const gs = gridStart.toISOString();
+  const ge = gridEnd.toISOString();
   const { data: events } = await supabase
     .from("calendar_events")
     .select("*")
     .eq("status", "scheduled")
-    .gte("start_time", gridStart.toISOString())
-    .lt("start_time", gridEnd.toISOString())
+    .lt("start_time", ge)
+    // Include events that either start in the window or, for multi-day/all-day
+    // events, end in it (so a span starting before the visible grid still shows).
+    .or(`start_time.gte.${gs},end_time.gte.${gs}`)
     .order("start_time", { ascending: true });
 
   const eventsByDay: Record<string, CalendarEvent[]> = {};
   for (const event of (events ?? []) as CalendarEvent[]) {
-    const key = localDayKey(event.start_time);
-    (eventsByDay[key] ??= []).push(event);
+    const startKey = localDayKey(event.start_time);
+    const endKey = event.end_time ? localDayKey(event.end_time) : startKey;
+    const keys = endKey > startKey ? eachDayKey(startKey, endKey) : [startKey];
+    for (const key of keys) (eventsByDay[key] ??= []).push(event);
   }
 
   const customerIds = Array.from(new Set((events ?? []).map((e) => e.customer_id).filter((id): id is string => Boolean(id))));

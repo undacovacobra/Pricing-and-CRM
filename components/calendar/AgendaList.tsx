@@ -55,7 +55,7 @@ export function AgendaList({ events, customerLabels }: { events: (CalendarEvent 
                           {TYPE_LABELS[event.event_type]}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">{timeRange(event.start_time, event.end_time)}</p>
+                      <p className="text-xs text-muted-foreground">{event.all_day ? "All day" : timeRange(event.start_time, event.end_time)}</p>
                       <div className="flex items-center gap-1 text-xs text-slate-600">
                         <User className="h-3 w-3 shrink-0" />
                         {teamMemberName(event.assigned_to)}

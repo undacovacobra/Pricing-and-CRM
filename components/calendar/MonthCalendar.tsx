@@ -124,7 +124,7 @@ export function MonthCalendar({
                   >
                     <span className={`h-2 w-2 rounded-full shrink-0 ${ASSIGNEE_DOT_COLORS[assigneeKind(event.assigned_to)]}`} />
                     <span className="truncate">
-                      <span className="font-semibold hidden sm:inline">{formatTime(event.start_time)} </span>
+                      <span className="font-semibold hidden sm:inline">{event.all_day ? "" : `${formatTime(event.start_time)} `}</span>
                       {event.title}
                     </span>
                   </div>

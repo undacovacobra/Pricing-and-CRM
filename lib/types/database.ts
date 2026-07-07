@@ -306,6 +306,7 @@ export interface CalendarEvent {
   location: string | null;
   start_time: string;
   end_time: string | null;
+  all_day: boolean;
   notes: string | null;
   reminder_minutes_before: number | null;
   status: CalendarEventStatus;

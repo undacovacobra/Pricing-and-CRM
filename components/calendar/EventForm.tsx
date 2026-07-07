@@ -26,6 +26,31 @@ const REMINDER_OPTIONS = [
   { value: "1440", label: "1 day before" },
 ];
 
+// How long an appointment lasts — 30 min to 6 hours, in half-hour steps.
+const DURATION_OPTIONS = [
+  { value: 30, label: "½ hour" },
+  { value: 60, label: "1 hour" },
+  { value: 90, label: "1½ hours" },
+  { value: 120, label: "2 hours" },
+  { value: 150, label: "2½ hours" },
+  { value: 180, label: "3 hours" },
+  { value: 210, label: "3½ hours" },
+  { value: 240, label: "4 hours" },
+  { value: 270, label: "4½ hours" },
+  { value: 300, label: "5 hours" },
+  { value: 330, label: "5½ hours" },
+  { value: 360, label: "6 hours" },
+];
+
+// Best-fit duration (in minutes) for an existing event, snapped to the options.
+function durationFromEvent(startIso: string | undefined, endIso: string | null | undefined): number {
+  if (!startIso || !endIso) return 60;
+  const mins = Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
+  if (!Number.isFinite(mins) || mins <= 0) return 60;
+  const snapped = Math.min(360, Math.max(30, Math.round(mins / 30) * 30));
+  return snapped;
+}
+
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local time, with no timezone suffix.
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -39,13 +64,6 @@ function toDateOnly(iso: string | null): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function toTimeOnly(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function customerAddress(c: Customer | undefined): string {
@@ -99,15 +117,17 @@ export function EventForm({
   );
   const defaultDate = searchParams.get("date");
   const initialStart = event?.start_time ? toLocalInput(event.start_time) : defaultDate ? `${defaultDate}T09:00` : "";
+  const [allDay, setAllDay] = useState(Boolean(event?.all_day));
   const [startDate, setStartDate] = useState(initialStart.split("T")[0] ?? "");
   const [startTimeOfDay, setStartTimeOfDay] = useState(initialStart.split("T")[1] ?? "09:00");
   const startTime = startDate ? `${startDate}T${startTimeOfDay || "09:00"}` : "";
-  const isMultiDay = Boolean(event?.end_time && toDateOnly(event.start_time) !== toDateOnly(event.end_time));
-  const [multiDay, setMultiDay] = useState(isMultiDay);
+  const [duration, setDuration] = useState<number>(durationFromEvent(event?.start_time, event?.end_time));
+  // All-day events may span multiple days via an end date.
   const [endDate, setEndDate] = useState(
-    isMultiDay && event?.end_time ? toDateOnly(event.end_time) : "",
+    event?.all_day && event?.end_time && toDateOnly(event.start_time) !== toDateOnly(event.end_time)
+      ? toDateOnly(event.end_time)
+      : "",
   );
-  const [endTime, setEndTime] = useState(event?.end_time ? toTimeOnly(event.end_time) : "");
   const [reminder, setReminder] = useState(
     event?.reminder_minutes_before != null ? String(event.reminder_minutes_before) : "60",
   );
@@ -139,8 +159,8 @@ export function EventForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !startTime) {
-      setError("Title and start time are required.");
+    if (!title.trim() || !startDate) {
+      setError("Title and date are required.");
       return;
     }
     setSaving(true);
@@ -148,12 +168,16 @@ export function EventForm({
 
     const assignedTo = assignedKind === "installer" ? installerName.trim() || "Installer" : assignedKind;
 
-    let endTimeIso: string | null = null;
-    if (multiDay && endDate) {
-      endTimeIso = new Date(`${endDate}T${endTime || "23:59"}:00`).toISOString();
-    } else if (!multiDay && endTime) {
-      const startDateOnly = startTime.split("T")[0];
-      endTimeIso = new Date(`${startDateOnly}T${endTime}:00`).toISOString();
+    // All-day events store noon (local) on the start and end dates so day-bucketing
+    // never drifts; timed events run from the start for the chosen duration.
+    let startIso: string;
+    let endIso: string;
+    if (allDay) {
+      startIso = new Date(`${startDate}T12:00:00`).toISOString();
+      endIso = new Date(`${endDate || startDate}T12:00:00`).toISOString();
+    } else {
+      startIso = new Date(startTime).toISOString();
+      endIso = new Date(new Date(startTime).getTime() + duration * 60000).toISOString();
     }
 
     const finalLocation = resolvedLocation.trim();
@@ -164,8 +188,9 @@ export function EventForm({
       job_id:                  jobId || null,
       assigned_to:             assignedTo,
       location:                finalLocation || null,
-      start_time:              new Date(startTime).toISOString(),
-      end_time:                endTimeIso,
+      start_time:              startIso,
+      end_time:                endIso,
+      all_day:                 allDay,
       notes:                   notes.trim() || null,
       reminder_minutes_before: reminder === "none" ? null : Number(reminder),
     };
@@ -182,8 +207,9 @@ export function EventForm({
       triggerBackup({ calendar: true });
 
       if (jobId) {
-        const when = new Date(startTime).toLocaleString("en-US", {
-          weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+        const when = new Date(startIso).toLocaleString("en-US", {
+          weekday: "short", month: "short", day: "numeric",
+          ...(allDay ? {} : { hour: "numeric", minute: "2-digit" }),
         });
         const whoLabel = assignedKind === "owner" ? "Travis" : assignedKind === "designer" ? "Carol" : assignedTo;
         await supabase.from("job_notes").insert({
@@ -328,49 +354,67 @@ export function EventForm({
             )}
           </div>
 
-          {/* Date */}
-          <div className="space-y-1.5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="start_date">Date *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="start_date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="flex-1"
-                  />
-                  <TimeSelect
-                    id="start_time_of_day"
-                    value={startTimeOfDay}
-                    onChange={setStartTimeOfDay}
-                    className="w-32 rounded-md border px-2 py-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="end_time_only">Ends</Label>
-                <TimeSelect id="end_time_only" value={endTime} onChange={setEndTime} allowEmpty />
-              </div>
-            </div>
-            <label className="flex items-center gap-2 pt-1">
+          {/* Date & time */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={multiDay}
-                onChange={(e) => {
-                  setMultiDay(e.target.checked);
-                  if (!e.target.checked) setEndDate("");
-                }}
+                checked={allDay}
+                onChange={(e) => setAllDay(e.target.checked)}
                 className="h-4 w-4 shrink-0"
               />
-              <span className="text-xs text-slate-600">This event spans multiple days</span>
+              <span className="text-sm text-slate-700">All day</span>
             </label>
-            {multiDay && (
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="end_date">End Date</Label>
-                <Input id="end_date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                <p className="text-xs text-muted-foreground">The &quot;Ends&quot; time above applies to this end date.</p>
+
+            {allDay ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start_date">Start date *</Label>
+                  <Input id="start_date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="end_date">End date</Label>
+                  <Input
+                    id="end_date"
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Leave blank for a single day. Otherwise it shows on every day through this date.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start_date">Date *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="flex-1"
+                    />
+                    <TimeSelect
+                      id="start_time_of_day"
+                      value={startTimeOfDay}
+                      onChange={setStartTimeOfDay}
+                      className="w-32 rounded-md border px-2 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>How long</Label>
+                  <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DURATION_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
           </div>

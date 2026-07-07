@@ -22,9 +22,9 @@ export default async function TodayPage() {
   const now = new Date();
   const todayKey = localDayKey(now.toISOString());
 
-  // Pull a small window around now (server runs in UTC) and keep only the
-  // events whose America/New_York day is today.
-  const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  // Pull a window around now (server runs in UTC). Reach back far enough to catch
+  // multi-day/all-day events that started earlier but still cover today.
+  const windowStart = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
   const windowEnd = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
 
   const [{ data: rawEvents }, { data: rawTasks }] = await Promise.all([
@@ -44,7 +44,11 @@ export default async function TodayPage() {
       .order("due_time", { ascending: true, nullsFirst: true }),
   ]);
 
-  const events = ((rawEvents ?? []) as CalendarEvent[]).filter((e) => localDayKey(e.start_time) === todayKey);
+  const events = ((rawEvents ?? []) as CalendarEvent[]).filter((e) => {
+    const startKey = localDayKey(e.start_time);
+    const endKey = e.end_time ? localDayKey(e.end_time) : startKey;
+    return startKey <= todayKey && todayKey <= endKey;
+  });
   const tasks = (rawTasks ?? []) as unknown as TaskRow[];
 
   const customerIds = Array.from(new Set(events.map((e) => e.customer_id).filter((id): id is string => Boolean(id))));
@@ -92,7 +96,7 @@ export default async function TodayPage() {
             <div key={event.id} className="rounded-lg border bg-white px-3 py-2.5 space-y-1">
               <Link href={`/calendar/${event.id}/edit`} className="block">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">{formatTime(event.start_time)}</span>
+                  <span className="text-sm font-semibold text-slate-900">{event.all_day ? "All day" : formatTime(event.start_time)}</span>
                   <span className="text-sm font-medium truncate">{event.title}</span>
                   <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${TYPE_COLORS[event.event_type] ?? "bg-slate-100 text-slate-600"}`}>
                     {TYPE_LABELS[event.event_type] ?? event.event_type}
