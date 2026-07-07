@@ -7,11 +7,31 @@ import { JobStageBadge } from "@/components/jobs/JobStageBadge";
 import { DeleteCustomerButton } from "@/components/customers/DeleteCustomerButton";
 import { formatCurrency, formatDate, formatPhoneNumber, customerName } from "@/lib/utils";
 import { Phone, Mail, MapPin, Pencil, Plus, Briefcase, FolderOpen, CalendarDays } from "lucide-react";
-import { CUSTOMER_TYPE_LABELS, type CustomerType, type JobStage } from "@/lib/types/database";
+import { CUSTOMER_TYPE_LABELS, type CustomerType, type JobStage, type Customer } from "@/lib/types/database";
+import { roleFromUser } from "@/lib/auth/roles";
+import { InstallerCustomerView } from "@/components/customers/InstallerCustomerView";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
+
+  // Installers get a read-only view: contact, address, and their jobs — no money.
+  const { data: { user: viewer } } = await supabase.auth.getUser();
+  if (roleFromUser(viewer) === "installer") {
+    const { data: icustomer } = await supabase.from("customers").select("*").eq("id", id).single();
+    if (!icustomer) notFound();
+    const { data: ijobs } = await supabase
+      .from("jobs")
+      .select("id, title, stage, job_address")
+      .or(`customer_id.eq.${id},parent_customer_id.eq.${id}`)
+      .order("created_at", { ascending: false });
+    return (
+      <InstallerCustomerView
+        customer={icustomer as Customer}
+        jobs={(ijobs ?? []) as { id: string; title: string; stage: string; job_address: string | null }[]}
+      />
+    );
+  }
 
   const { data: customer } = await supabase
     .from("customers")

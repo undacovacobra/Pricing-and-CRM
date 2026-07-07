@@ -31,8 +31,8 @@ const navItems = [
   { href: "/settings",     label: "Settings",    icon: Settings },
 ];
 
-// Installers only get the day view, calendar, and tasks.
-const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks"]);
+// Installers get the day view, calendar, tasks, and read-only jobs/customers.
+const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks", "/jobs", "/customers"]);
 
 export function Sidebar({ userName, role }: { userName: string; role: AppRole }) {
   const pathname = usePathname();

@@ -44,13 +44,22 @@ export function roleFromUser(user: RoleUser): AppRole {
   return (user?.email ?? "").toLowerCase() === DESIGNER_EMAIL ? "designer" : "owner";
 }
 
-// Which top-level areas each role may open. Installers are limited to the day
-// view, calendar, and tasks; everyone else has full access.
-const INSTALLER_ALLOWED = ["/today", "/calendar", "/tasks"];
+// Which top-level areas each role may open. Installers get the day view, calendar,
+// tasks, and a read-only view of jobs/customers (for addresses, notes, drawings);
+// everyone else has full access.
+const INSTALLER_ALLOWED = ["/today", "/calendar", "/tasks", "/jobs", "/customers"];
 
 export function pathAllowedForRole(pathname: string, role: AppRole): boolean {
   if (role !== "installer") return true;
-  return INSTALLER_ALLOWED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const inScope = INSTALLER_ALLOWED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (!inScope) return false;
+  // Jobs/customers are view-only for installers: no creating, editing, or the
+  // document tools (which expose pricing).
+  if (pathname.startsWith("/jobs") || pathname.startsWith("/customers")) {
+    if (pathname.endsWith("/new") || pathname.endsWith("/edit")) return false;
+    if (pathname.includes("/documents")) return false;
+  }
+  return true;
 }
 
 export const INSTALLER_HOME = "/today";

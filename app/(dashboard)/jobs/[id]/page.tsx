@@ -15,6 +15,8 @@ import { DeleteJobButton } from "@/components/jobs/DeleteJobButton";
 import { CacheJobForOffline } from "@/components/offline/CacheJobForOffline";
 import { JobTasksSection } from "@/components/jobs/JobTasksSection";
 import { roleFromEmail } from "@/lib/tasks/shared";
+import { roleFromUser } from "@/lib/auth/roles";
+import { InstallerJobView } from "@/components/jobs/InstallerJobView";
 import type { TaskRow } from "@/components/tasks/TaskItem";
 import { googleConfigured } from "@/lib/google/drive";
 import { getGoogleConnectionStatus } from "@/lib/google/connection";
@@ -36,6 +38,41 @@ const documentTypeLabels: Record<DocumentType, string> = {
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
+
+  // Installers get a stripped-down, read-only view (address, appointments,
+  // drawings, attachments, notes) — no pricing or other financial details.
+  const { data: { user: viewer } } = await supabase.auth.getUser();
+  if (roleFromUser(viewer) === "installer") {
+    const { data: ijob } = await supabase
+      .from("jobs")
+      .select("id, title, job_address, google_drive_folder_url, customer:customers!jobs_customer_id_fkey(id, first_name, last_name)")
+      .eq("id", id)
+      .single();
+    if (!ijob) notFound();
+    const cust = ijob.customer as unknown as { id: string; first_name: string; last_name: string } | null;
+    const [{ data: iAppts }, { data: iDrawings }, { data: iAttachments }, { data: iNotes }] = await Promise.all([
+      supabase.from("calendar_events").select("*").eq("job_id", id).eq("status", "scheduled").order("start_time", { ascending: true }),
+      supabase.from("job_drawings").select("*").eq("job_id", id).order("sort_order", { ascending: true }).limit(12),
+      supabase.from("job_attachments").select("*").eq("job_id", id).order("created_at", { ascending: false }),
+      supabase.from("job_notes").select("id, author, content, created_at").eq("job_id", id).order("created_at", { ascending: false }),
+    ]);
+    return (
+      <InstallerJobView
+        job={{
+          id: ijob.id,
+          title: ijob.title,
+          job_address: ijob.job_address,
+          google_drive_folder_url: ijob.google_drive_folder_url,
+          customerName: cust ? `${cust.first_name ?? ""} ${cust.last_name ?? ""}`.trim() : null,
+          customerId: cust?.id ?? null,
+        }}
+        appointments={(iAppts ?? []) as CalendarEvent[]}
+        drawings={(iDrawings ?? []) as JobDrawing[]}
+        attachments={(iAttachments ?? []) as JobAttachment[]}
+        notes={(iNotes ?? []) as { id: string; author: string; content: string; created_at: string }[]}
+      />
+    );
+  }
 
   const { data: job } = await supabase
     .from("jobs")

@@ -18,7 +18,7 @@ const mobileNavItems = [
   { href: "/settings",     label: "Settings", icon: Settings },
 ];
 
-const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks"]);
+const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks", "/jobs", "/customers"]);
 
 export function MobileNav({ role }: { role: AppRole }) {
   const pathname = usePathname();
