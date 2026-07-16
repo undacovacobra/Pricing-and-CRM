@@ -8,8 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { triggerBackup } from "@/lib/backup/trigger";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download } from "lucide-react";
 import type { DesignerCommission } from "@/lib/types/database";
+
+function invoiceUrl(path: string) {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${path}`;
+}
 
 interface CommissionWithJob extends DesignerCommission {
   job: { title: string; customer: { first_name: string; last_name: string } | null } | null;
@@ -67,6 +71,26 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  {c.invoice_storage_path && (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={invoiceUrl(c.invoice_storage_path)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        View
+                      </a>
+                      <a
+                        href={invoiceUrl(c.invoice_storage_path)}
+                        download
+                        className="text-slate-400 hover:text-slate-700"
+                        title="Download invoice"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </div>
+                  )}
                   <div className="text-right">
                     <p className="text-sm font-semibold text-green-700">
                       {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
@@ -132,12 +156,20 @@ function CommissionRow({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${c.invoice_storage_path}`}
+            href={invoiceUrl(c.invoice_storage_path)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-blue-600 hover:underline"
           >
             View Invoice
+          </a>
+          <a
+            href={invoiceUrl(c.invoice_storage_path)}
+            download
+            className="text-slate-400 hover:text-slate-700"
+            title="Download invoice"
+          >
+            <Download className="h-4 w-4" />
           </a>
           {isOwner && (
             <Button size="sm" onClick={() => setPaying(!paying)}>
