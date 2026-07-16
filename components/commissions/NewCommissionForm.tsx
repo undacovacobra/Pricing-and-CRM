@@ -32,35 +32,50 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
     setError(null);
     setUploading(true);
 
-    const path = `${jobMode === "existing" ? jobId : "unlinked"}/${Date.now()}-${file.name}`;
-    const { error: uploadErr } = await supabase.storage.from("commission-invoices").upload(path, file);
-    if (uploadErr) { setError(uploadErr.message); setUploading(false); return; }
+    try {
+      // Sanitize the filename so the storage key can't contain characters that
+      // break the upload URL (spaces, #, non-ASCII from phone photos, etc.).
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
+      const path = `${jobMode === "existing" ? jobId : "unlinked"}/${Date.now()}-${safeName}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("commission-invoices")
+        .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+      if (uploadErr) { setError(`Couldn't upload the file: ${uploadErr.message}`); setUploading(false); return; }
 
-    await supabase.from("designer_commissions").insert({
-      job_id:                jobMode === "existing" ? jobId : null,
-      job_name_freeform:     jobMode === "freeform" ? jobName.trim() : null,
-      invoice_storage_path:  path,
-      amount:                amount ? parseFloat(amount) : null,
-      status:                "pending",
-      submitted_at:          new Date().toISOString(),
-      notes:                 notes.trim(),
-    });
-
-    if (jobMode === "existing" && jobId) {
-      await supabase.from("job_notes").insert({
-        job_id:  jobId,
-        author:  "designer",
-        content: "Internal invoice submitted",
+      await supabase.from("designer_commissions").insert({
+        job_id:                jobMode === "existing" ? jobId : null,
+        job_name_freeform:     jobMode === "freeform" ? jobName.trim() : null,
+        invoice_storage_path:  path,
+        amount:                amount ? parseFloat(amount) : null,
+        status:                "pending",
+        submitted_at:          new Date().toISOString(),
+        notes:                 notes.trim(),
       });
+
+      if (jobMode === "existing" && jobId) {
+        await supabase.from("job_notes").insert({
+          job_id:  jobId,
+          author:  "designer",
+          content: "Internal invoice submitted",
+        });
+      }
+
+      triggerBackup({ commissions: true, jobId: jobMode === "existing" ? jobId : undefined });
+
+      setUploading(false);
+      setOpen(false);
+      setJobId(""); setJobName(""); setAmount(""); setNotes("");
+      if (fileRef.current) fileRef.current.value = "";
+      router.refresh();
+    } catch (err) {
+      // A thrown TypeError here is usually a dropped/blocked network request.
+      setError(
+        err instanceof Error && err.message === "Failed to fetch"
+          ? "Upload failed — check your connection and try again. Large files over a weak signal can time out."
+          : `Something went wrong: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      setUploading(false);
     }
-
-    triggerBackup({ commissions: true, jobId: jobMode === "existing" ? jobId : undefined });
-
-    setUploading(false);
-    setOpen(false);
-    setJobId(""); setJobName(""); setAmount(""); setNotes("");
-    if (fileRef.current) fileRef.current.value = "";
-    router.refresh();
   }
 
   if (!open) {
