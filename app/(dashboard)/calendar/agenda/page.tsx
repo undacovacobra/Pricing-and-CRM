@@ -18,12 +18,17 @@ export default async function CalendarAgendaPage() {
 
   const customerIds = Array.from(new Set((events ?? []).map((e) => e.customer_id).filter((id): id is string => Boolean(id))));
   const { data: customers } = customerIds.length
-    ? await supabase.from("customers").select("id, first_name, last_name, city").in("id", customerIds)
+    ? await supabase.from("customers").select("id, first_name, last_name, city, phone, address_line1, state, zip").in("id", customerIds)
     : { data: [] };
 
   const customerLabels: Record<string, string> = {};
+  const customerPhones: Record<string, string> = {};
+  const customerAddresses: Record<string, string> = {};
   for (const c of customers ?? []) {
     customerLabels[c.id] = customerName(c) + (c.city ? ` — ${c.city}` : "");
+    if (c.phone) customerPhones[c.id] = c.phone;
+    const addr = [c.address_line1, c.city, c.state, c.zip].filter(Boolean).join(", ");
+    if (addr) customerAddresses[c.id] = addr;
   }
 
   return (
@@ -48,7 +53,7 @@ export default async function CalendarAgendaPage() {
           </Button>
         </div>
       </div>
-      <AgendaList events={(events ?? []) as CalendarEvent[]} customerLabels={customerLabels} />
+      <AgendaList events={(events ?? []) as CalendarEvent[]} customerLabels={customerLabels} customerPhones={customerPhones} customerAddresses={customerAddresses} />
     </div>
   );
 }

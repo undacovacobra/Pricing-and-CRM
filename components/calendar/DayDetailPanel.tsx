@@ -2,19 +2,23 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { teamMemberName } from "@/lib/utils";
+import { teamMemberName, formatPhoneNumber } from "@/lib/utils";
 import { TYPE_LABELS, TYPE_COLORS, mapsLink, timeRange } from "@/components/calendar/eventStyles";
-import { MapPin, User, Briefcase, Plus } from "lucide-react";
+import { MapPin, User, Briefcase, Plus, Phone } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types/database";
 
 export function DayDetailPanel({
   dayKey,
   events,
   customerLabels,
+  customerPhones = {},
+  customerAddresses = {},
 }: {
   dayKey: string;
   events: CalendarEvent[];
   customerLabels: Record<string, string>;
+  customerPhones?: Record<string, string>;
+  customerAddresses?: Record<string, string>;
 }) {
   const heading = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(
     new Date(`${dayKey}T00:00:00`),
@@ -53,17 +57,40 @@ export function DayDetailPanel({
                 </div>
               )}
               {event.location && (
-                <a
-                  href={mapsLink(event.location)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                >
+                <div className="flex items-center gap-1 text-xs text-slate-600">
                   <MapPin className="h-3 w-3 shrink-0" />
-                  {event.location}
-                </a>
+                  <span className="truncate">{event.location}</span>
+                </div>
               )}
+              {(() => {
+                const phone = customerPhones[event.customer_id ?? ""];
+                const directions = event.location || customerAddresses[event.customer_id ?? ""];
+                if (!phone && !directions) return null;
+                return (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {phone && (
+                      <a
+                        href={`tel:${phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Phone className="h-3 w-3 text-slate-500" /> {formatPhoneNumber(phone)}
+                      </a>
+                    )}
+                    {directions && (
+                      <a
+                        href={mapsLink(directions)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <MapPin className="h-3 w-3 text-slate-500" /> Directions
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </Link>
         ))}
