@@ -62,6 +62,19 @@ export function NewCommissionForm({ jobs }: { jobs: Job[] }) {
 
       triggerBackup({ commissions: true, jobId: jobMode === "existing" ? jobId : undefined });
 
+      // Notify the owner by email (fire-and-forget — never block the submission).
+      const jobLabel = jobMode === "existing" ? (jobs.find((j) => j.id === jobId)?.title ?? "") : jobName.trim();
+      fetch("/api/commissions/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: notes.trim(),
+          jobLabel,
+          amount: amount ? parseFloat(amount) : null,
+          invoicePath: path,
+        }),
+      }).catch(() => {});
+
       setUploading(false);
       setOpen(false);
       setJobId(""); setJobName(""); setAmount(""); setNotes("");

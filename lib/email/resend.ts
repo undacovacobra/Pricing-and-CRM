@@ -165,6 +165,60 @@ export function appointmentReminderEmail(input: AppointmentEmailInput): { subjec
   };
 }
 
+interface CommissionEmailInput {
+  description: string;
+  jobLabel: string | null;
+  amount: number | null;
+  invoiceUrl: string | null;
+  submittedByLabel?: string | null;
+}
+
+// Internal notification sent to the owner when a designer uploads a new
+// commission/invoice submission.
+export function commissionSubmittedEmail(input: CommissionEmailInput): { subject: string; html: string } {
+  const amountStr =
+    input.amount != null
+      ? input.amount.toLocaleString("en-US", { style: "currency", currency: "USD" })
+      : "Not specified";
+  const rows = [
+    input.jobLabel ? ["Job", esc(input.jobLabel)] : null,
+    ["Amount", esc(amountStr)],
+    input.submittedByLabel ? ["Submitted by", esc(input.submittedByLabel)] : null,
+    input.description ? ["Note", esc(input.description)] : null,
+  ].filter(Boolean) as [string, string][];
+
+  const table = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%; margin:16px 0; border-collapse:collapse;">
+      ${rows
+        .map(
+          ([label, value]) => `
+      <tr>
+        <td style="padding:6px 0; color:#64748b; width:110px; vertical-align:top;">${label}</td>
+        <td style="padding:6px 0; font-weight:bold;">${value}</td>
+      </tr>`,
+        )
+        .join("")}
+    </table>
+  `;
+
+  const button = input.invoiceUrl
+    ? `<p style="margin:20px 0 0;">
+         <a href="${input.invoiceUrl}" style="display:inline-block; background:#0f172a; color:#ffffff; text-decoration:none; padding:10px 18px; border-radius:8px; font-size:14px;">View the uploaded file</a>
+       </p>`
+    : "";
+
+  const body = `
+    <p style="font-size:18px; margin:0 0 4px;">New commission submitted</p>
+    <p style="color:#475569; margin:0 0 4px;">A new invoice was just uploaded for a commission:</p>
+    ${table}
+    ${button}
+  `;
+  return {
+    subject: `New commission submitted${input.jobLabel ? ` — ${input.jobLabel}` : ""}`,
+    html: layout(body, COMPANY.name, COMPANY.phone),
+  };
+}
+
 function esc(v: unknown): string {
   return String(v ?? "")
     .replace(/&/g, "&amp;")
