@@ -303,6 +303,26 @@ export async function listDriveFolderChildren(accessToken: string, folderId: str
   return out;
 }
 
+// Searches the whole Drive (My Drive + Shared Drives) for folders whose name
+// contains the given text. Used to match hand-made job folders by customer name.
+export async function searchDriveFoldersByName(accessToken: string, name: string): Promise<DriveChild[]> {
+  const safe = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const params = new URLSearchParams({
+    q: `mimeType = 'application/vnd.google-apps.folder' and name contains '${safe}' and trashed = false`,
+    fields: "files(id, name, mimeType)",
+    pageSize: "100",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
+    corpora: "allDrives",
+  });
+  const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Drive folder search failed: ${await res.text()}`);
+  const data = (await res.json()) as { files?: DriveChild[] };
+  return data.files ?? [];
+}
+
 // Deletes a Drive file/folder the app created. Ignores 404 (already gone).
 export async function deleteDriveFile(accessToken: string, fileId: string): Promise<void> {
   const res = await fetch(`${DRIVE_FILES_URL}/${fileId}`, {

@@ -26,6 +26,7 @@ import {
   deleteDriveFile,
   refreshAccessToken,
   listDriveFolderChildren,
+  searchDriveFoldersByName,
   downloadDriveFile,
   type DriveChild,
 } from "@/lib/google/drive";
@@ -386,28 +387,18 @@ function folderIdFromUrl(url: string | null | undefined): string | null {
 // the app, where files are saved) — or an explicit override if one was set —
 // falling back to the app-created backup folder. Skips folders, app-created
 // backup copies, and anything already imported.
-export async function importJobDriveFiles(
+// Imports every new (non-folder, not-already-known) file inside a Drive folder
+// into a job's attachments. Returns how many were newly imported.
+async function importFolderIntoJob(
   admin: SupabaseClient,
   token: string,
   jobId: string,
+  folderId: string,
+  recursive: boolean,
 ): Promise<number> {
-  const { data: job } = await admin
-    .from("jobs")
-    .select("drive_import_folder_id, google_drive_folder_url")
-    .eq("id", jobId)
-    .maybeSingle();
-  // The job's real, user-facing folder: an explicit override, else the folder
-  // already attached to the job.
-  const userFolderId =
-    (job?.drive_import_folder_id as string | null) ?? folderIdFromUrl(job?.google_drive_folder_url as string | null);
-  const folderId = userFolderId ?? (await getMapped(admin, `job:${jobId}`));
-  if (!folderId) return 0;
-
   let children: DriveChild[];
   try {
-    // Recurse through the user's folder (they use subfolders); the app's own
-    // backup folders are flat.
-    children = userFolderId
+    children = recursive
       ? await listFilesRecursive(token, folderId)
       : await listDriveFolderChildren(token, folderId);
   } catch {
@@ -453,6 +444,32 @@ export async function importJobDriveFiles(
   return imported;
 }
 
+// Pulls any file a user dropped into a job's Drive folder back into that job's
+// CRM attachments. Uses the folder already attached to the job (the one shown in
+// the app, where files are saved) — or an explicit override if one was set —
+// falling back to the app-created backup folder. Skips folders, app-created
+// backup copies, and anything already imported.
+export async function importJobDriveFiles(
+  admin: SupabaseClient,
+  token: string,
+  jobId: string,
+): Promise<number> {
+  const { data: job } = await admin
+    .from("jobs")
+    .select("drive_import_folder_id, google_drive_folder_url")
+    .eq("id", jobId)
+    .maybeSingle();
+  // The job's real, user-facing folder: an explicit override, else the folder
+  // already attached to the job.
+  const userFolderId =
+    (job?.drive_import_folder_id as string | null) ?? folderIdFromUrl(job?.google_drive_folder_url as string | null);
+  const folderId = userFolderId ?? (await getMapped(admin, `job:${jobId}`));
+  if (!folderId) return 0;
+  // Recurse through the user's folder (they use subfolders); the app's own
+  // backup folders are flat.
+  return importFolderIntoJob(admin, token, jobId, folderId, Boolean(userFolderId));
+}
+
 // Reverse-syncs every job that has a Drive folder. Run before backupEverything so
 // the dedupe mapping is in place before the outgoing pass scans attachments.
 export async function importEverythingFromDrive(admin: SupabaseClient, token: string): Promise<number> {
@@ -462,6 +479,57 @@ export async function importEverythingFromDrive(admin: SupabaseClient, token: st
     imported += await importJobDriveFiles(admin, token, j.id as string);
   }
   return imported;
+}
+
+export interface FolderMatchResult {
+  job: string;
+  lastName: string;
+  folders: string[];
+  imported: number;
+}
+
+// Scans the whole Drive for folders whose name contains a job's customer last
+// name, and imports files from any that the app didn't create. Catches jobs whose
+// folders were set up by hand in Drive and never linked to the app. Skips folders
+// the app made (they're already mapped) so backups aren't re-imported.
+export async function importJobsByLastNameMatch(
+  admin: SupabaseClient,
+  token: string,
+): Promise<FolderMatchResult[]> {
+  const { data: jobs } = await admin
+    .from("jobs")
+    .select("id, title, customer:customers!jobs_customer_id_fkey(last_name)");
+
+  const results: FolderMatchResult[] = [];
+  for (const job of jobs ?? []) {
+    const cust = job.customer as unknown as { last_name?: string | null } | null;
+    const lastName = (cust?.last_name ?? "").trim();
+    if (lastName.length < 2) continue; // too short to match safely
+
+    let folders: DriveChild[];
+    try {
+      folders = await searchDriveFoldersByName(token, lastName);
+    } catch {
+      continue;
+    }
+
+    let imported = 0;
+    const matchedNames: string[] = [];
+    for (const folder of folders) {
+      // Skip folders the app itself created (already tracked) — we only want the
+      // user's own, hand-made folders.
+      if (await isKnownDriveId(admin, folder.id)) continue;
+      const n = await importFolderIntoJob(admin, token, job.id as string, folder.id, true);
+      if (n > 0) {
+        imported += n;
+        matchedNames.push(folder.name);
+      }
+    }
+    if (imported > 0) {
+      results.push({ job: job.title as string, lastName, folders: matchedNames, imported });
+    }
+  }
+  return results;
 }
 
 // ---- Contacts backup --------------------------------------------------------
