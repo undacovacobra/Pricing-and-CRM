@@ -59,7 +59,7 @@ export default async function CommissionsPage() {
 
       <NewCommissionForm jobs={jobs ?? []} />
 
-      <CommissionList commissions={commissions ?? []} isOwner={isOwner} />
+      <CommissionList commissions={commissions ?? []} isOwner={isOwner} jobs={jobs ?? []} />
     </div>
   );
 }

@@ -1,15 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { triggerBackup } from "@/lib/backup/trigger";
-import { Trash2, Download } from "lucide-react";
-import type { DesignerCommission } from "@/lib/types/database";
+import { Trash2, Download, Pencil } from "lucide-react";
+import type { DesignerCommission, Job } from "@/lib/types/database";
 
 function invoiceUrl(path: string) {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/commission-invoices/${path}`;
@@ -23,7 +24,7 @@ function commissionTitle(c: CommissionWithJob) {
   return c.notes || c.job?.title || c.job_name_freeform || "No description";
 }
 
-export function CommissionList({ commissions, isOwner }: { commissions: CommissionWithJob[]; isOwner: boolean }) {
+export function CommissionList({ commissions, isOwner, jobs }: { commissions: CommissionWithJob[]; isOwner: boolean; jobs: Job[] }) {
   const router = useRouter();
   const supabase = createClient();
   const pending = commissions.filter((c) => c.status === "pending");
@@ -49,7 +50,7 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
             <p className="text-sm text-muted-foreground text-center py-4">No pending commissions.</p>
           )}
           {pending.map((c) => (
-            <CommissionRow key={c.id} commission={c} isOwner={isOwner} onDelete={() => handleDelete(c)} />
+            <CommissionRow key={c.id} commission={c} isOwner={isOwner} jobs={jobs} onDelete={() => handleDelete(c)} />
           ))}
         </CardContent>
       </Card>
@@ -113,10 +114,12 @@ export function CommissionList({ commissions, isOwner }: { commissions: Commissi
 function CommissionRow({
   commission: c,
   isOwner,
+  jobs,
   onDelete,
 }: {
   commission: CommissionWithJob;
   isOwner: boolean;
+  jobs: Job[];
   onDelete: () => void;
 }) {
   const router = useRouter();
@@ -126,6 +129,17 @@ function CommissionRow({
   const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
   const [method, setMethod] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Editing (pending commissions only).
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState(false);
+  const [jobMode, setJobMode] = useState<"existing" | "freeform">(c.job_id ? "existing" : "freeform");
+  const [jobId, setJobId] = useState(c.job_id ?? "");
+  const [jobName, setJobName] = useState(c.job_name_freeform ?? "");
+  const [editAmount, setEditAmount] = useState(c.amount?.toString() ?? "");
+  const [editNotes, setEditNotes] = useState(c.notes ?? "");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
 
   async function handleMarkPaid() {
     setLoading(true);
@@ -139,6 +153,44 @@ function CommissionRow({
     setLoading(false);
     setPaying(false);
     router.refresh();
+  }
+
+  async function handleSaveEdit() {
+    if (jobMode === "existing" && !jobId) { setEditErr("Select a job or switch to a typed name."); return; }
+    if (jobMode === "freeform" && !jobName.trim()) { setEditErr("Enter a job name."); return; }
+    setSavingEdit(true);
+    setEditErr(null);
+    try {
+      let invoicePath = c.invoice_storage_path;
+      const file = fileRef.current?.files?.[0];
+      if (file) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_") || "file";
+        const path = `${jobMode === "existing" ? jobId : "unlinked"}/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("commission-invoices")
+          .upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (upErr) { setEditErr(`Couldn't upload the new file: ${upErr.message}`); setSavingEdit(false); return; }
+        if (c.invoice_storage_path) {
+          await supabase.storage.from("commission-invoices").remove([c.invoice_storage_path]).catch(() => {});
+        }
+        invoicePath = path;
+      }
+      await supabase.from("designer_commissions").update({
+        job_id:               jobMode === "existing" ? jobId : null,
+        job_name_freeform:    jobMode === "freeform" ? jobName.trim() : null,
+        amount:               editAmount ? parseFloat(editAmount) : null,
+        notes:                editNotes.trim() || null,
+        invoice_storage_path: invoicePath,
+      }).eq("id", c.id);
+      triggerBackup({ commissions: true, jobId: jobMode === "existing" ? jobId : undefined });
+      setSavingEdit(false);
+      setEditing(false);
+      if (fileRef.current) fileRef.current.value = "";
+      router.refresh();
+    } catch (e) {
+      setEditErr(String(e));
+      setSavingEdit(false);
+    }
   }
 
   return (
@@ -171,8 +223,11 @@ function CommissionRow({
           >
             <Download className="h-4 w-4" />
           </a>
+          <Button size="sm" variant="outline" onClick={() => { setEditing(!editing); setPaying(false); }}>
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Button>
           {isOwner && (
-            <Button size="sm" onClick={() => setPaying(!paying)}>
+            <Button size="sm" onClick={() => { setPaying(!paying); setEditing(false); }}>
               Mark Paid
             </Button>
           )}
@@ -181,6 +236,71 @@ function CommissionRow({
           </Button>
         </div>
       </div>
+
+      {editing && (
+        <div className="bg-slate-50 rounded-lg p-3 space-y-3 border">
+          <p className="text-sm font-medium">Edit commission</p>
+          <div className="space-y-1">
+            <Label className="text-xs">Job</Label>
+            <div className="flex gap-2 mb-1">
+              <button
+                type="button"
+                onClick={() => setJobMode("existing")}
+                className={`text-xs px-2 py-1 rounded border ${jobMode === "existing" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+              >
+                Pick a job
+              </button>
+              <button
+                type="button"
+                onClick={() => setJobMode("freeform")}
+                className={`text-xs px-2 py-1 rounded border ${jobMode === "freeform" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}
+              >
+                Type a name
+              </button>
+            </div>
+            {jobMode === "existing" ? (
+              <Select value={jobId} onValueChange={setJobId}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select a job" /></SelectTrigger>
+                <SelectContent>
+                  {jobs.map((j) => (
+                    <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="Job name" className="h-8 text-sm" />
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount ($)</Label>
+              <Input type="number" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Note / description</Label>
+              <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="h-8 text-sm" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Replace file (optional)</Label>
+            <input
+              ref={fileRef}
+              type="file"
+              className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-white file:text-xs file:font-medium hover:file:bg-slate-100"
+            />
+            <p className="text-[11px] text-muted-foreground">Leave empty to keep the current file.</p>
+          </div>
+          {editErr && <p className="text-xs text-destructive">{editErr}</p>}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSaveEdit} disabled={savingEdit}>
+              {savingEdit ? "Saving..." : "Save changes"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setEditErr(null); }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       {paying && isOwner && (
         <div className="bg-slate-50 rounded-lg p-3 space-y-3 border">
