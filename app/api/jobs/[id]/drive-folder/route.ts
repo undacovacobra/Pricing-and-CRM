@@ -33,15 +33,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const g = await gate(id);
   if (g.error) return g.error;
 
-  let body: { url?: string };
+  // Body is optional: no url = just "Sync now" using the folder already attached
+  // to the job; a url = set an explicit override folder, then sync.
+  let body: { url?: string } = {};
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  }
-  const folderId = extractFolderId(body.url ?? "");
-  if (!folderId) {
-    return NextResponse.json({ error: "bad_link", detail: "That doesn't look like a Google Drive folder link." }, { status: 400 });
+    body = {};
   }
 
   const admin = createAdminClient();
@@ -50,27 +48,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "no_connection", detail: "Google Drive isn't connected (Settings → Connect Google Drive)." }, { status: 400 });
   }
 
-  // Confirm the connected account can actually see the folder before saving it.
-  try {
-    await listDriveFolderChildren(token, folderId);
-  } catch {
-    return NextResponse.json(
-      { error: "no_access", detail: "The connected Google account can't open that folder. Make sure it's shared with the account used for backups." },
-      { status: 400 },
-    );
+  const rawUrl = (body.url ?? "").trim();
+  if (rawUrl) {
+    const folderId = extractFolderId(rawUrl);
+    if (!folderId) {
+      return NextResponse.json({ error: "bad_link", detail: "That doesn't look like a Google Drive folder link." }, { status: 400 });
+    }
+    // Confirm the connected account can actually see the folder before saving it.
+    try {
+      await listDriveFolderChildren(token, folderId);
+    } catch {
+      return NextResponse.json(
+        { error: "no_access", detail: "The connected Google account can't open that folder. Make sure it's shared with the account used for backups." },
+        { status: 400 },
+      );
+    }
+    const { error: upErr } = await admin
+      .from("jobs")
+      .update({ drive_import_folder_id: folderId, drive_import_folder_url: rawUrl })
+      .eq("id", id);
+    if (upErr) return NextResponse.json({ error: "save_failed", detail: upErr.message }, { status: 502 });
   }
-
-  const { error: upErr } = await admin
-    .from("jobs")
-    .update({ drive_import_folder_id: folderId, drive_import_folder_url: (body.url ?? "").trim() || null })
-    .eq("id", id);
-  if (upErr) return NextResponse.json({ error: "save_failed", detail: upErr.message }, { status: 502 });
 
   let imported = 0;
   try {
     imported = await importJobDriveFiles(admin, token, id);
   } catch {
-    // Folder linked fine; import can be retried from the sync button.
+    // Import can be retried from the sync button.
   }
   return NextResponse.json({ ok: true, imported });
 }

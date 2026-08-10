@@ -374,10 +374,18 @@ async function listFilesRecursive(token: string, folderId: string, depth = 0): P
   return out;
 }
 
+// Pulls a Google Drive folder id out of a folder share link.
+function folderIdFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/folders\/([-\w]+)/);
+  return m ? m[1] : null;
+}
+
 // Pulls any file a user dropped into a job's Drive folder back into that job's
-// CRM attachments. Prefers a folder the user explicitly linked to the job (their
-// own Drive/Shared Drive folder); otherwise uses the app-created backup folder.
-// Skips folders, app-created backup copies, and anything already imported.
+// CRM attachments. Uses the folder already attached to the job (the one shown in
+// the app, where files are saved) — or an explicit override if one was set —
+// falling back to the app-created backup folder. Skips folders, app-created
+// backup copies, and anything already imported.
 export async function importJobDriveFiles(
   admin: SupabaseClient,
   token: string,
@@ -385,17 +393,21 @@ export async function importJobDriveFiles(
 ): Promise<number> {
   const { data: job } = await admin
     .from("jobs")
-    .select("drive_import_folder_id")
+    .select("drive_import_folder_id, google_drive_folder_url")
     .eq("id", jobId)
     .maybeSingle();
-  const linkedFolderId = (job?.drive_import_folder_id as string | null) ?? null;
-  const folderId = linkedFolderId ?? (await getMapped(admin, `job:${jobId}`));
+  // The job's real, user-facing folder: an explicit override, else the folder
+  // already attached to the job.
+  const userFolderId =
+    (job?.drive_import_folder_id as string | null) ?? folderIdFromUrl(job?.google_drive_folder_url as string | null);
+  const folderId = userFolderId ?? (await getMapped(admin, `job:${jobId}`));
   if (!folderId) return 0;
 
   let children: DriveChild[];
   try {
-    // Recurse for user-linked folders; the app's own folders are flat.
-    children = linkedFolderId
+    // Recurse through the user's folder (they use subfolders); the app's own
+    // backup folders are flat.
+    children = userFolderId
       ? await listFilesRecursive(token, folderId)
       : await listDriveFolderChildren(token, folderId);
   } catch {

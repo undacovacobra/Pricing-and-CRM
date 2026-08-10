@@ -306,8 +306,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <CardContent className="space-y-3">
               <JobDriveFolderLink
                 jobId={id}
-                initialUrl={job.drive_import_folder_url ?? null}
-                initialLinked={Boolean(job.drive_import_folder_id)}
+                folderUrl={job.drive_import_folder_url ?? job.google_drive_folder_url ?? null}
+                hasOverride={Boolean(job.drive_import_folder_id)}
               />
               <JobAttachmentsSection jobId={id} attachments={(attachments ?? []) as JobAttachment[]} googleReady={googleReady} />
             </CardContent>
