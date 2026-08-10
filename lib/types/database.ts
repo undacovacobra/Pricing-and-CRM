@@ -119,6 +119,8 @@ export interface Job {
   assigned_to: string | null;
   parent_customer_id: string | null;
   google_drive_folder_url: string | null;
+  drive_import_folder_id: string | null;
+  drive_import_folder_url: string | null;
   retainer_amount: number | null;
   pay_deposit_paid: boolean;
   pay_deposit_amount: number | null;

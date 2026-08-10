@@ -27,6 +27,7 @@ import {
   refreshAccessToken,
   listDriveFolderChildren,
   downloadDriveFile,
+  type DriveChild,
 } from "@/lib/google/drive";
 
 const ROOT_NAME = "Coastal Edge CRM Backup";
@@ -357,20 +358,46 @@ async function isKnownDriveId(admin: SupabaseClient, driveId: string): Promise<b
   return !!data;
 }
 
+// Walks a folder and all its subfolders, returning every non-folder file. Used
+// for user-linked folders, which people tend to organize with subfolders.
+async function listFilesRecursive(token: string, folderId: string, depth = 0): Promise<DriveChild[]> {
+  if (depth > 6) return [];
+  const children = await listDriveFolderChildren(token, folderId);
+  const out: DriveChild[] = [];
+  for (const c of children) {
+    if (c.mimeType === "application/vnd.google-apps.folder") {
+      out.push(...(await listFilesRecursive(token, c.id, depth + 1)));
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
 // Pulls any file a user dropped into a job's Drive folder back into that job's
-// CRM attachments. Skips folders, app-created backup copies, and anything already
-// imported. Returns the number of new files imported this run.
+// CRM attachments. Prefers a folder the user explicitly linked to the job (their
+// own Drive/Shared Drive folder); otherwise uses the app-created backup folder.
+// Skips folders, app-created backup copies, and anything already imported.
 export async function importJobDriveFiles(
   admin: SupabaseClient,
   token: string,
   jobId: string,
 ): Promise<number> {
-  const folderId = await getMapped(admin, `job:${jobId}`);
+  const { data: job } = await admin
+    .from("jobs")
+    .select("drive_import_folder_id")
+    .eq("id", jobId)
+    .maybeSingle();
+  const linkedFolderId = (job?.drive_import_folder_id as string | null) ?? null;
+  const folderId = linkedFolderId ?? (await getMapped(admin, `job:${jobId}`));
   if (!folderId) return 0;
 
-  let children;
+  let children: DriveChild[];
   try {
-    children = await listDriveFolderChildren(token, folderId);
+    // Recurse for user-linked folders; the app's own folders are flat.
+    children = linkedFolderId
+      ? await listFilesRecursive(token, folderId)
+      : await listDriveFolderChildren(token, folderId);
   } catch {
     // Most likely the owner hasn't re-connected with read access yet — skip quietly.
     return 0;

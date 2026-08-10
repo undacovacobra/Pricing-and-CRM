@@ -286,6 +286,10 @@ export async function listDriveFolderChildren(accessToken: string, folderId: str
       q: `'${folderId}' in parents and trashed = false`,
       fields: "nextPageToken, files(id, name, mimeType, modifiedTime)",
       pageSize: "1000",
+      // Include files that live in Shared Drives, not just "My Drive".
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+      corpora: "allDrives",
     });
     if (pageToken) params.set("pageToken", pageToken);
     const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, {
@@ -337,7 +341,7 @@ export async function downloadDriveFile(
     const bytes = await exportGoogleDoc(accessToken, fileId, "application/pdf");
     return { bytes, contentType: "application/pdf", extension: ".pdf" };
   }
-  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media`, {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?alt=media&supportsAllDrives=true`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`Drive download failed: ${await res.text()}`);

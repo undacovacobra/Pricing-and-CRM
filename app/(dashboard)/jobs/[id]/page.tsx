@@ -8,6 +8,7 @@ import { StageSelector } from "@/components/jobs/StageSelector";
 import { AddNoteForm } from "@/components/jobs/AddNoteForm";
 import { MaterialOrdersSection } from "@/components/jobs/MaterialOrdersSection";
 import { JobAttachmentsSection } from "@/components/jobs/JobAttachmentsSection";
+import { JobDriveFolderLink } from "@/components/jobs/JobDriveFolderLink";
 import { GoogleDriveLink } from "@/components/jobs/GoogleDriveLink";
 import { ContractDocsSection } from "@/components/jobs/ContractDocsSection";
 import { PaymentTracker } from "@/components/jobs/PaymentTracker";
@@ -302,7 +303,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <Paperclip className="h-4 w-4" /> Attachments
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <JobDriveFolderLink
+                jobId={id}
+                initialUrl={job.drive_import_folder_url ?? null}
+                initialLinked={Boolean(job.drive_import_folder_id)}
+              />
               <JobAttachmentsSection jobId={id} attachments={(attachments ?? []) as JobAttachment[]} googleReady={googleReady} />
             </CardContent>
           </Card>
