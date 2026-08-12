@@ -1,10 +1,13 @@
 "use client";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, RotateCcw, Trash2, CalendarClock, Briefcase } from "lucide-react";
-import { completeTask, reopenTask, deleteTask } from "@/app/(dashboard)/tasks/actions";
+import { Check, RotateCcw, Trash2, CalendarClock, Briefcase, Pencil } from "lucide-react";
+import { completeTask, reopenTask, deleteTask, updateTask } from "@/app/(dashboard)/tasks/actions";
 import { taskPersonLabel } from "@/lib/tasks/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TimeSelect } from "@/components/ui/time-select";
 
 export interface TaskRow {
   id: string;
@@ -43,11 +46,71 @@ export function TaskItem({ task, showJob = true }: { task: TaskRow; showJob?: bo
   const done = task.status === "done";
   const due = dueLabel(task.due_date, task.due_time);
 
+  // Inline editing.
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? "");
+  const [dueDate, setDueDate] = useState(task.due_date ?? "");
+  const [dueTime, setDueTime] = useState(task.due_time ?? "");
+  const [assignedTo, setAssignedTo] = useState<"owner" | "designer">(task.assigned_to === "designer" ? "designer" : "owner");
+  const [error, setError] = useState<string | null>(null);
+
   function run(fn: () => Promise<unknown>) {
     startTransition(async () => {
       await fn();
       router.refresh();
     });
+  }
+
+  function saveEdit() {
+    if (!title.trim()) { setError("A title is required."); return; }
+    setError(null);
+    startTransition(async () => {
+      const res = await updateTask({
+        id: task.id,
+        title,
+        description: description || null,
+        due_date: dueDate || null,
+        due_time: dueDate && dueTime ? dueTime : null,
+        assigned_to: assignedTo,
+      });
+      if (!res.ok) { setError(res.error || "Could not save."); return; }
+      setEditing(false);
+      router.refresh();
+    });
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border bg-white p-3 space-y-2">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title" autoFocus />
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Notes (optional)" />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-500">
+            Due
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="ml-1 rounded-md border px-2 py-1 text-sm" />
+          </label>
+          <label className="text-xs text-slate-500">
+            Time
+            <TimeSelect value={dueTime} onChange={setDueTime} disabled={!dueDate} allowEmpty className="ml-1 rounded-md border px-2 py-1 text-sm disabled:opacity-50" />
+          </label>
+          <label className="text-xs text-slate-500">
+            For
+            <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value as "owner" | "designer")} className="ml-1 rounded-md border px-2 py-1 text-sm">
+              <option value="owner">Travis</option>
+              <option value="designer">Carol</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setEditing(false); setError(null); }} disabled={pending}>Cancel</Button>
+            <Button size="sm" onClick={saveEdit} disabled={pending || !title.trim()}>{pending ? "Saving…" : "Save"}</Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -87,6 +150,14 @@ export function TaskItem({ task, showJob = true }: { task: TaskRow; showJob?: bo
             <RotateCcw className="h-4 w-4" />
           </button>
         )}
+        <button
+          onClick={() => setEditing(true)}
+          disabled={pending}
+          title="Edit"
+          className="p-1 text-slate-400 hover:text-slate-700"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
         <button
           onClick={() => {
             if (confirm("Delete this task?")) run(() => deleteTask(task.id));

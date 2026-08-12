@@ -68,6 +68,89 @@ export async function createTask(input: CreateTaskInput): Promise<{ ok: boolean;
   return { ok: true };
 }
 
+export interface UpdateTaskInput {
+  id: string;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  due_time?: string | null;
+  assigned_to?: string | null;
+}
+
+export async function updateTask(input: UpdateTaskInput): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const title = input.title?.trim();
+  if (!title) return { ok: false, error: "A title is required." };
+
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("calendar_event_id, job_id, status")
+    .eq("id", input.id)
+    .maybeSingle();
+  if (!task) return { ok: false, error: "Task not found." };
+
+  const { role } = await currentRole();
+  const assigned = normalizeRole(input.assigned_to, role);
+  const dueDate = input.due_date || null;
+  const dueTime = input.due_time && /^\d{2}:\d{2}$/.test(input.due_time) ? input.due_time : null;
+  const description = input.description?.trim() || null;
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      title,
+      description,
+      due_date: dueDate,
+      due_time: dueTime,
+      assigned_to: assigned,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id);
+  if (error) return { ok: false, error: error.message };
+
+  // Keep the linked calendar reminder in sync with the new details.
+  const eventId = task.calendar_event_id as string | null;
+  if (dueDate) {
+    const start = taskCalendarStart(dueDate, dueTime);
+    if (eventId) {
+      await supabase
+        .from("calendar_events")
+        .update({
+          title: `Task: ${title}`,
+          assigned_to: assigned,
+          start_time: start,
+          notes: description,
+          status: task.status === "done" ? "cancelled" : "scheduled",
+        })
+        .eq("id", eventId);
+    } else if (task.status !== "done") {
+      const { data: ev } = await supabase
+        .from("calendar_events")
+        .insert({
+          title: `Task: ${title}`,
+          event_type: "task",
+          assigned_to: assigned,
+          job_id: task.job_id,
+          start_time: start,
+          status: "scheduled",
+          notes: description,
+        })
+        .select("id")
+        .single();
+      if (ev) await supabase.from("tasks").update({ calendar_event_id: ev.id }).eq("id", input.id);
+    }
+  } else if (eventId) {
+    // Due date removed — drop the reminder.
+    await supabase.from("calendar_events").delete().eq("id", eventId);
+    await supabase.from("tasks").update({ calendar_event_id: null }).eq("id", input.id);
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
+  if (task.job_id) revalidatePath(`/jobs/${task.job_id}`);
+  return { ok: true };
+}
+
 export async function completeTask(id: string): Promise<{ ok: boolean }> {
   const supabase = await createClient();
   const { data: task } = await supabase.from("tasks").select("calendar_event_id, job_id").eq("id", id).maybeSingle();
