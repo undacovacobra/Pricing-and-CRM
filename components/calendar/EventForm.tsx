@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { TimeSelect } from "@/components/ui/time-select";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomerCombobox } from "@/components/calendar/CustomerCombobox";
@@ -284,15 +285,13 @@ export function EventForm({
           {eventType !== "personal" && (
             <div className="space-y-1.5">
               <Label>Job</Label>
-              <Select value={jobId || "none"} onValueChange={(v) => setJobId(v === "none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {jobsForCustomer.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>{j.title} — {j.customerLabel}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={jobId}
+                onValueChange={setJobId}
+                options={jobsForCustomer.map((j) => ({ value: j.id, label: j.title, hint: j.customerLabel }))}
+                placeholder="None"
+                emptyLabel="None"
+              />
               {customerId && jobsForCustomer.length === 0 && (
                 <p className="text-xs text-muted-foreground">This customer has no jobs yet.</p>
               )}

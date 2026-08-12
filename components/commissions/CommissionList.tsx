@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { triggerBackup } from "@/lib/backup/trigger";
 import { Trash2, Download, Pencil } from "lucide-react";
@@ -259,14 +259,12 @@ function CommissionRow({
               </button>
             </div>
             {jobMode === "existing" ? (
-              <Select value={jobId} onValueChange={setJobId}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select a job" /></SelectTrigger>
-                <SelectContent>
-                  {jobs.map((j) => (
-                    <SelectItem key={j.id} value={j.id}>{j.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={jobId}
+                onValueChange={setJobId}
+                options={jobs.map((j) => ({ value: j.id, label: j.title }))}
+                placeholder="Select a job"
+              />
             ) : (
               <Input value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="Job name" className="h-8 text-sm" />
             )}

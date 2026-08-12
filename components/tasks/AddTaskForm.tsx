@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createTask } from "@/app/(dashboard)/tasks/actions";
 import { TimeSelect } from "@/components/ui/time-select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // Compact add-task form, reused on the Tasks page, the calendar page, and inside
 // a job. When jobId is set the task is linked to that job (and the job picker is
@@ -106,21 +107,17 @@ export function AddTaskForm({
       </div>
 
       {!jobId && jobs && jobs.length > 0 && (
-        <label className="block text-xs text-slate-500">
+        <div className="text-xs text-slate-500">
           Attach to job
-          <select
+          <SearchableSelect
+            className="mt-1"
             value={jobChoice}
-            onChange={(e) => setJobChoice(e.target.value)}
-            className="mt-1 block w-full rounded-md border px-2 py-1.5 text-sm"
-          >
-            <option value="">— None —</option>
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.title}
-              </option>
-            ))}
-          </select>
-        </label>
+            onValueChange={setJobChoice}
+            options={jobs.map((j) => ({ value: j.id, label: j.title }))}
+            placeholder="— None —"
+            emptyLabel="— None —"
+          />
+        </div>
       )}
 
       <div className="flex items-center gap-2">
