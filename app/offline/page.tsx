@@ -74,10 +74,15 @@ export default function OfflineWorkspace() {
 
   useEffect(() => {
     setOnline(navigator.onLine);
-    // If we happen to be online here, pull everything down first, then list it.
+    // Show whatever is cached immediately; refresh from the server in the
+    // background if we can. Never block the list on a network call — that's
+    // what left the page stuck on "Loading…" over a flaky connection.
     (async () => {
-      if (navigator.onLine) await primeOfflineCache();
       await load();
+      if (navigator.onLine) {
+        await primeOfflineCache();
+        await load();
+      }
     })();
     const on = () => {
       setOnline(true);
@@ -91,6 +96,31 @@ export default function OfflineWorkspace() {
       window.removeEventListener("offline", off);
     };
   }, [load]);
+
+  // Escape hatch: this page is only meant as a fallback, so as soon as the
+  // server is ACTUALLY reachable, send the user back to the full app on our
+  // own. navigator.onLine lies on flaky mobile data, so we probe with a real
+  // request — HEAD, because the service worker only intercepts GETs, so this
+  // can't be answered from cache and can't bounce us back here.
+  useEffect(() => {
+    if (editing || selected) return; // don't yank someone out mid-drawing
+    let stopped = false;
+    async function probe() {
+      if (!navigator.onLine) return;
+      try {
+        const res = await fetch("/", { method: "HEAD", cache: "no-store" });
+        if (!stopped && res.ok) window.location.replace("/");
+      } catch {
+        // Still not really reachable — keep waiting.
+      }
+    }
+    probe();
+    const timer = setInterval(probe, 4000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [editing, selected]);
 
   async function openJob(job: JobRow) {
     setSelected(job);
@@ -215,7 +245,7 @@ export default function OfflineWorkspace() {
       <div className="max-w-3xl mx-auto p-4 space-y-4">
         <p className="text-sm text-slate-500">
           {online
-            ? "You’re back online — your full app is available. This is the lightweight offline workspace."
+            ? "You’re back online — taking you to the full app as soon as the connection is steady…"
             : "You’re offline. You can open your cached jobs, draw, and save here. Everything syncs automatically when you reconnect."}
         </p>
 

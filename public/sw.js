@@ -8,9 +8,9 @@
 // workspace that runs entirely from on-device data (IndexedDB) and lets the
 // user open cached jobs, draw, and save. Static assets are cached so that page
 // (and its scripts) load with no signal.
-// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v6
+// SW_VERSION: bump this string on any change so browsers fetch a fresh worker. v7
 
-const CACHE = "coastal-edge-v6";
+const CACHE = "coastal-edge-v7";
 
 // The offline workspace shell, pre-fetched on install so it's available the
 // first time the device goes offline — no warm-up browsing required.
@@ -83,10 +83,17 @@ async function cacheFirst(request) {
 async function navigationHandler(request) {
   try {
     return await fetch(request);
-  } catch (err) {
-    const offline = await caches.match("/offline");
-    if (offline) return offline;
-    throw err;
+  } catch {
+    // Retry once after a beat — a transient blip (tower handoff, one dropped
+    // handshake) must not strand the user in the offline workspace.
+    try {
+      await new Promise((r) => setTimeout(r, 700));
+      return await fetch(request);
+    } catch (err) {
+      const offline = await caches.match("/offline");
+      if (offline) return offline;
+      throw err;
+    }
   }
 }
 
