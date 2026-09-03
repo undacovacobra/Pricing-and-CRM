@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { roleFromUser, type AppRole } from "@/lib/auth/roles";
 
-const VALID_ROLES: AppRole[] = ["owner", "designer", "installer"];
+const VALID_ROLES: AppRole[] = ["owner", "designer", "installer", "bookkeeper"];
 
 async function requireOwner() {
   const supabase = await createClient();

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./lib/supabase/config";
-import { roleFromUser, pathAllowedForRole, INSTALLER_HOME } from "./lib/auth/roles";
+import { roleFromUser, pathAllowedForRole, homeForRole, isLimitedRole } from "./lib/auth/roles";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -44,16 +44,17 @@ export async function middleware(request: NextRequest) {
 
   const role = user ? roleFromUser(user) : null;
 
-  if (user && isAuthPage) {
+  if (user && role && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = role === "installer" ? INSTALLER_HOME : "/";
+    url.pathname = homeForRole(role);
     return NextResponse.redirect(url);
   }
 
-  // Installers may only open the calendar / tasks areas; send them home otherwise.
-  if (user && role === "installer" && !isPublic && !pathAllowedForRole(request.nextUrl.pathname, role)) {
+  // Limited roles (installer, bookkeeper) may only open their own areas; send
+  // them back to their home page for anything else.
+  if (user && role && isLimitedRole(role) && !isPublic && !pathAllowedForRole(request.nextUrl.pathname, role)) {
     const url = request.nextUrl.clone();
-    url.pathname = INSTALLER_HOME;
+    url.pathname = homeForRole(role);
     url.search = "";
     return NextResponse.redirect(url);
   }

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, todayInputValue } from "@/lib/utils";
 import { triggerBackup } from "@/lib/backup/trigger";
 import { Trash2, Download, Pencil } from "lucide-react";
 import type { DesignerCommission, Job } from "@/lib/types/database";
@@ -24,7 +24,17 @@ function commissionTitle(c: CommissionWithJob) {
   return c.notes || c.job?.title || c.job_name_freeform || "No description";
 }
 
-export function CommissionList({ commissions, isOwner, jobs }: { commissions: CommissionWithJob[]; isOwner: boolean; jobs: Job[] }) {
+export function CommissionList({
+  commissions,
+  isOwner,
+  jobs,
+  readOnly = false,
+}: {
+  commissions: CommissionWithJob[];
+  isOwner: boolean;
+  jobs: Job[];
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const pending = commissions.filter((c) => c.status === "pending");
@@ -50,7 +60,7 @@ export function CommissionList({ commissions, isOwner, jobs }: { commissions: Co
             <p className="text-sm text-muted-foreground text-center py-4">No pending commissions.</p>
           )}
           {pending.map((c) => (
-            <CommissionRow key={c.id} commission={c} isOwner={isOwner} jobs={jobs} onDelete={() => handleDelete(c)} />
+            <CommissionRow key={c.id} commission={c} isOwner={isOwner} jobs={jobs} readOnly={readOnly} onDelete={() => handleDelete(c)} />
           ))}
         </CardContent>
       </Card>
@@ -98,9 +108,11 @@ export function CommissionList({ commissions, isOwner, jobs }: { commissions: Co
                     </p>
                     <p className="text-xs text-muted-foreground">Paid {c.paid_at ? formatDate(c.paid_at) : ""}</p>
                   </div>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDelete(c)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {!readOnly && (
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDelete(c)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -115,18 +127,20 @@ function CommissionRow({
   commission: c,
   isOwner,
   jobs,
+  readOnly = false,
   onDelete,
 }: {
   commission: CommissionWithJob;
   isOwner: boolean;
   jobs: Job[];
+  readOnly?: boolean;
   onDelete: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [paying, setPaying] = useState(false);
   const [paidAmount, setPaidAmount] = useState(c.amount?.toString() ?? "");
-  const [paidDate, setPaidDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paidDate, setPaidDate] = useState(todayInputValue());
   const [method, setMethod] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -146,7 +160,9 @@ function CommissionRow({
     await supabase.from("designer_commissions").update({
       status:         "paid",
       paid_amount:    parseFloat(paidAmount) || c.amount,
-      paid_at:        new Date(paidDate).toISOString(),
+      // Store midday so the recorded day can't shift backwards when read in
+      // another zone (plain "YYYY-MM-DD" parses as UTC midnight).
+      paid_at:        new Date(`${paidDate}T12:00:00`).toISOString(),
       payment_method: method || null,
     }).eq("id", c.id);
     triggerBackup({ commissions: true });
@@ -223,17 +239,21 @@ function CommissionRow({
           >
             <Download className="h-4 w-4" />
           </a>
-          <Button size="sm" variant="outline" onClick={() => { setEditing(!editing); setPaying(false); }}>
-            <Pencil className="h-3.5 w-3.5" /> Edit
-          </Button>
-          {isOwner && (
+          {!readOnly && (
+            <Button size="sm" variant="outline" onClick={() => { setEditing(!editing); setPaying(false); }}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </Button>
+          )}
+          {isOwner && !readOnly && (
             <Button size="sm" onClick={() => { setPaying(!paying); setEditing(false); }}>
               Mark Paid
             </Button>
           )}
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={onDelete}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {!readOnly && (
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={onDelete}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 

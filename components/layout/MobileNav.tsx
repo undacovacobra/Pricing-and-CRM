@@ -19,10 +19,16 @@ const mobileNavItems = [
 ];
 
 const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks", "/jobs", "/customers"]);
+const BOOKKEEPER_HREFS = new Set(["/commissions"]);
 
 export function MobileNav({ role }: { role: AppRole }) {
   const pathname = usePathname();
-  const items = role === "installer" ? mobileNavItems.filter((i) => INSTALLER_HREFS.has(i.href)) : mobileNavItems;
+  const items =
+    role === "installer"
+      ? mobileNavItems.filter((i) => INSTALLER_HREFS.has(i.href))
+      : role === "bookkeeper"
+        ? mobileNavItems.filter((i) => BOOKKEEPER_HREFS.has(i.href))
+        : mobileNavItems;
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t pb-[env(safe-area-inset-bottom)]">

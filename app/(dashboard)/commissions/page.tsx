@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { CommissionList } from "@/components/commissions/CommissionList";
 import { NewCommissionForm } from "@/components/commissions/NewCommissionForm";
+import { roleFromUser } from "@/lib/auth/roles";
 
 export default async function CommissionsPage() {
   const supabase = await createClient();
@@ -16,8 +17,11 @@ export default async function CommissionsPage() {
     supabase.auth.getUser(),
   ]);
 
+  // Bookkeepers can look but not touch: no submitting, editing, or recording payments.
+  const readOnly = roleFromUser(userData?.user) === "bookkeeper";
+
   let isOwner = false;
-  if (userData?.user) {
+  if (userData?.user && !readOnly) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -57,9 +61,9 @@ export default async function CommissionsPage() {
         </Card>
       </div>
 
-      <NewCommissionForm jobs={jobs ?? []} />
+      {!readOnly && <NewCommissionForm jobs={jobs ?? []} />}
 
-      <CommissionList commissions={commissions ?? []} isOwner={isOwner} jobs={jobs ?? []} />
+      <CommissionList commissions={commissions ?? []} isOwner={isOwner} jobs={jobs ?? []} readOnly={readOnly} />
     </div>
   );
 }

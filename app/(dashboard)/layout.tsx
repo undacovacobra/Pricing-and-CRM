@@ -6,7 +6,7 @@ import { AutoDriveSync } from "@/components/backup/AutoDriveSync";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { createClient } from "@/lib/supabase/server";
 import { userNameForEmail } from "@/lib/team";
-import { roleFromUser } from "@/lib/auth/roles";
+import { roleFromUser, isLimitedRole } from "@/lib/auth/roles";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -36,8 +36,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </main>
         <MobileNav role={role} />
-        {role !== "installer" && <AssistantWidget />}
-        {role !== "installer" && <AutoDriveSync />}
+        {!isLimitedRole(role) && <AssistantWidget />}
+        {!isLimitedRole(role) && <AutoDriveSync />}
         <OfflineManager />
       </div>
     </div>

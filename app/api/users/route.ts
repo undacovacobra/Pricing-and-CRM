@@ -9,7 +9,7 @@ import {
   type AppRole,
 } from "@/lib/auth/roles";
 
-const VALID_ROLES: AppRole[] = ["owner", "designer", "installer"];
+const VALID_ROLES: AppRole[] = ["owner", "designer", "installer", "bookkeeper"];
 
 // Confirms the caller is a signed-in owner. Returns the owner's user id or an
 // error response to short-circuit with.

@@ -35,8 +35,11 @@ function parseMonthParam(month?: string): Date {
     const [y, m] = month.split("-").map(Number);
     return new Date(y, m - 1, 1);
   }
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
+  // Default to the CURRENT month in Eastern time. Using the server clock (UTC on
+  // Vercel) would roll over to the next day — and on the last of the month, the
+  // next month — from 8pm Eastern onward.
+  const [y, m] = localDayKey(new Date().toISOString()).split("-").map(Number);
+  return new Date(y, m - 1, 1);
 }
 
 export default async function CalendarPage({
@@ -52,8 +55,12 @@ export default async function CalendarPage({
   const gridEnd = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + 42);
 
   const supabase = await createClient();
-  const gs = gridStart.toISOString();
-  const ge = gridEnd.toISOString();
+  // Pad the window by a day on each side: the grid bounds are UTC midnights but
+  // events are bucketed by their Eastern day, so without the padding an evening
+  // event on the first/last visible day falls outside the query and vanishes.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const gs = new Date(gridStart.getTime() - DAY_MS).toISOString();
+  const ge = new Date(gridEnd.getTime() + DAY_MS).toISOString();
   const { data: events } = await supabase
     .from("calendar_events")
     .select("*")

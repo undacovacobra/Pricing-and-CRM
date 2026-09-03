@@ -33,12 +33,20 @@ const navItems = [
 
 // Installers get the day view, calendar, tasks, and read-only jobs/customers.
 const INSTALLER_HREFS = new Set(["/today", "/calendar", "/tasks", "/jobs", "/customers"]);
+// Bookkeepers see commissions and nothing else.
+const BOOKKEEPER_HREFS = new Set(["/commissions"]);
+
+function navFor(role: AppRole) {
+  if (role === "installer") return navItems.filter((i) => INSTALLER_HREFS.has(i.href));
+  if (role === "bookkeeper") return navItems.filter((i) => BOOKKEEPER_HREFS.has(i.href));
+  return navItems;
+}
 
 export function Sidebar({ userName, role }: { userName: string; role: AppRole }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const items = role === "installer" ? navItems.filter((i) => INSTALLER_HREFS.has(i.href)) : navItems;
+  const items = navFor(role);
 
   async function handleLogout() {
     await supabase.auth.signOut();

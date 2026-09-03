@@ -11,7 +11,7 @@ interface AppUser {
   id: string;
   login: string;
   isUsername: boolean;
-  role: "owner" | "designer" | "installer";
+  role: "owner" | "designer" | "installer" | "bookkeeper";
   displayName: string;
   isSelf: boolean;
 }
@@ -26,7 +26,7 @@ export function UsersCard() {
   const [newName, setNewName] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState<"owner" | "designer" | "installer">("installer");
+  const [newRole, setNewRole] = useState<"owner" | "designer" | "installer" | "bookkeeper">("installer");
   const [saving, setSaving] = useState(false);
 
   // Per-user password reset
@@ -145,6 +145,7 @@ export function UsersCard() {
                         <SelectItem value="owner">Owner</SelectItem>
                         <SelectItem value="designer">Designer</SelectItem>
                         <SelectItem value="installer">Installer</SelectItem>
+                        <SelectItem value="bookkeeper">Bookkeeper</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => { setResetId(resetId === u.id ? null : u.id); setResetPassword(""); }}>
@@ -177,6 +178,9 @@ export function UsersCard() {
                     <Button size="sm" variant="outline" className="h-8" onClick={() => { setResetId(null); setResetPassword(""); }}>Cancel</Button>
                   </div>
                 )}
+                {u.role === "bookkeeper" && (
+                  <p className="text-[11px] text-muted-foreground">Sees only the commissions page (view only).</p>
+                )}
                 {u.role === "installer" && (
                   <p className="text-[11px] text-muted-foreground">Sees only the calendar and tasks.</p>
                 )}
@@ -207,6 +211,7 @@ export function UsersCard() {
                   <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="installer">Installer</SelectItem>
+                    <SelectItem value="bookkeeper">Bookkeeper</SelectItem>
                     <SelectItem value="designer">Designer</SelectItem>
                     <SelectItem value="owner">Owner</SelectItem>
                   </SelectContent>
