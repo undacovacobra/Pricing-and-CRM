@@ -26,13 +26,16 @@ function commissionTitle(c: CommissionWithJob) {
 
 export function CommissionList({
   commissions,
-  isOwner,
+  canMarkPaid,
   jobs,
   readOnly = false,
 }: {
   commissions: CommissionWithJob[];
-  isOwner: boolean;
+  // Who may record a payment: the owner, and the bookkeeper.
+  canMarkPaid: boolean;
   jobs: Job[];
+  // Read-only hides submitting, editing, and deleting — a bookkeeper can still
+  // record a payment.
   readOnly?: boolean;
 }) {
   const router = useRouter();
@@ -60,7 +63,7 @@ export function CommissionList({
             <p className="text-sm text-muted-foreground text-center py-4">No pending commissions.</p>
           )}
           {pending.map((c) => (
-            <CommissionRow key={c.id} commission={c} isOwner={isOwner} jobs={jobs} readOnly={readOnly} onDelete={() => handleDelete(c)} />
+            <CommissionRow key={c.id} commission={c} canMarkPaid={canMarkPaid} jobs={jobs} readOnly={readOnly} onDelete={() => handleDelete(c)} />
           ))}
         </CardContent>
       </Card>
@@ -125,13 +128,13 @@ export function CommissionList({
 
 function CommissionRow({
   commission: c,
-  isOwner,
+  canMarkPaid,
   jobs,
   readOnly = false,
   onDelete,
 }: {
   commission: CommissionWithJob;
-  isOwner: boolean;
+  canMarkPaid: boolean;
   jobs: Job[];
   readOnly?: boolean;
   onDelete: () => void;
@@ -244,7 +247,7 @@ function CommissionRow({
               <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
           )}
-          {isOwner && !readOnly && (
+          {canMarkPaid && (
             <Button size="sm" onClick={() => { setPaying(!paying); setEditing(false); }}>
               Mark Paid
             </Button>
@@ -320,7 +323,7 @@ function CommissionRow({
         </div>
       )}
 
-      {paying && isOwner && (
+      {paying && canMarkPaid && (
         <div className="bg-slate-50 rounded-lg p-3 space-y-3 border">
           <p className="text-sm font-medium">Record Payment</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

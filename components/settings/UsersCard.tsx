@@ -179,7 +179,7 @@ export function UsersCard() {
                   </div>
                 )}
                 {u.role === "bookkeeper" && (
-                  <p className="text-[11px] text-muted-foreground">Sees only the commissions page (view only).</p>
+                  <p className="text-[11px] text-muted-foreground">Sees only the commissions page. Can record payments, but can&apos;t add, edit, or delete.</p>
                 )}
                 {u.role === "installer" && (
                   <p className="text-[11px] text-muted-foreground">Sees only the calendar and tasks.</p>

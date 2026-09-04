@@ -17,11 +17,13 @@ export default async function CommissionsPage() {
     supabase.auth.getUser(),
   ]);
 
-  // Bookkeepers can look but not touch: no submitting, editing, or recording payments.
-  const readOnly = roleFromUser(userData?.user) === "bookkeeper";
+  // Bookkeepers can view commissions and record payments, but can't submit new
+  // ones, edit them, or delete them.
+  const isBookkeeper = roleFromUser(userData?.user) === "bookkeeper";
+  const readOnly = isBookkeeper;
 
   let isOwner = false;
-  if (userData?.user && !readOnly) {
+  if (userData?.user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -29,6 +31,7 @@ export default async function CommissionsPage() {
       .single();
     isOwner = profile?.role === "owner";
   }
+  const canMarkPaid = isOwner || isBookkeeper;
 
   const pending = commissions?.filter((c) => c.status === "pending") ?? [];
   const paid = commissions?.filter((c) => c.status === "paid") ?? [];
@@ -63,7 +66,7 @@ export default async function CommissionsPage() {
 
       {!readOnly && <NewCommissionForm jobs={jobs ?? []} />}
 
-      <CommissionList commissions={commissions ?? []} isOwner={isOwner} jobs={jobs ?? []} readOnly={readOnly} />
+      <CommissionList commissions={commissions ?? []} canMarkPaid={canMarkPaid} jobs={jobs ?? []} readOnly={readOnly} />
     </div>
   );
 }
