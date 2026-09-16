@@ -309,6 +309,11 @@ export interface CalendarEvent {
   start_time: string;
   end_time: string | null;
   all_day: boolean;
+  // Repeating events are materialised as one row per occurrence; every row in a
+  // series shares recurrence_group_id.
+  recurrence: "daily" | "weekly" | "monthly" | null;
+  recurrence_until: string | null;
+  recurrence_group_id: string | null;
   notes: string | null;
   reminder_minutes_before: number | null;
   status: CalendarEventStatus;

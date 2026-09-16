@@ -43,6 +43,65 @@ const DURATION_OPTIONS = [
   { value: 360, label: "6 hours" },
 ];
 
+type Recurrence = "none" | "daily" | "weekly" | "monthly";
+
+const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: "none",    label: "Does not repeat" },
+  { value: "daily",   label: "Every day" },
+  { value: "weekly",  label: "Every week" },
+  { value: "monthly", label: "Every month" },
+];
+
+// Hard ceiling on how many events one series may create, so a stray end date
+// can't spawn thousands of rows.
+const MAX_OCCURRENCES = 400;
+
+// Date math is done on plain "YYYY-MM-DD" strings using UTC arithmetic. That
+// keeps the wall-clock time of each occurrence identical across a DST change —
+// stepping real Date objects by 24h would shift 9am to 8am after the clocks move.
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Same day-of-month N months on, clamped to the month's length so the 31st
+// lands on the 30th (or the 28th/29th) rather than spilling into next month.
+function addMonthsToDateStr(dateStr: string, months: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const target = m - 1 + months;
+  const year = y + Math.floor(target / 12);
+  const month = ((target % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(d, lastDay);
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// Every start date in the series, first occurrence included.
+function occurrenceDates(startDate: string, rule: Recurrence, until: string): string[] {
+  if (rule === "none" || !startDate || !until || until < startDate) return [startDate];
+  const out = [startDate];
+  for (let i = 1; i <= MAX_OCCURRENCES; i++) {
+    const next =
+      rule === "daily"  ? addDaysToDateStr(startDate, i)
+      : rule === "weekly" ? addDaysToDateStr(startDate, 7 * i)
+      : addMonthsToDateStr(startDate, i);
+    if (next > until) break;
+    out.push(next);
+  }
+  return out;
+}
+
+// A sensible default end date so picking "repeats" doesn't demand a second decision.
+function defaultUntilFor(rule: Recurrence, startDate: string): string {
+  if (!startDate) return "";
+  if (rule === "daily") return addMonthsToDateStr(startDate, 1);
+  if (rule === "weekly") return addMonthsToDateStr(startDate, 3);
+  if (rule === "monthly") return addMonthsToDateStr(startDate, 12);
+  return "";
+}
+
 // Best-fit duration (in minutes) for an existing event, snapped to the options.
 function durationFromEvent(startIso: string | undefined, endIso: string | null | undefined): number {
   if (!startIso || !endIso) return 60;
@@ -123,6 +182,9 @@ export function EventForm({
   const [startTimeOfDay, setStartTimeOfDay] = useState(initialStart.split("T")[1] ?? "09:00");
   const startTime = startDate ? `${startDate}T${startTimeOfDay || "09:00"}` : "";
   const [duration, setDuration] = useState<number>(durationFromEvent(event?.start_time, event?.end_time));
+  // Repeating is only offered when creating; editing touches a single occurrence.
+  const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [recurrenceUntil, setRecurrenceUntil] = useState("");
   // All-day events may span multiple days via an end date.
   const [endDate, setEndDate] = useState(
     event?.all_day && event?.end_time && toDateOnly(event.start_time) !== toDateOnly(event.end_time)
@@ -164,6 +226,10 @@ export function EventForm({
       setError("Title and date are required.");
       return;
     }
+    if (!event && recurrence !== "none") {
+      if (!recurrenceUntil) { setError("Choose a date to repeat until."); return; }
+      if (recurrenceUntil < startDate) { setError("The repeat-until date must be on or after the start date."); return; }
+    }
     setSaving(true);
     setError(null);
 
@@ -203,7 +269,45 @@ export function EventForm({
       router.push("/calendar");
       router.refresh();
     } else {
-      const { data: created, error: insertErr } = await supabase.from("calendar_events").insert(data).select().single();
+      // A repeating event is stored as one row per occurrence, all sharing a
+      // group id. Materialising them keeps every existing feature — reminders,
+      // day buckets, the agenda, job links — working with no special cases.
+      const dates = occurrenceDates(startDate, recurrence, recurrenceUntil);
+      if (dates.length > MAX_OCCURRENCES) {
+        setError(`That repeats ${dates.length} times. Pick an earlier "repeat until" date.`);
+        setSaving(false);
+        return;
+      }
+      const groupId = recurrence === "none" ? null : crypto.randomUUID();
+      // All-day events can span several days; keep that span on every occurrence.
+      const spanDays =
+        allDay && endDate && endDate > startDate
+          ? Math.round((Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000)
+          : 0;
+
+      const rows = dates.map((occDate) => {
+        let occStart: string;
+        let occEnd: string;
+        if (allDay) {
+          occStart = new Date(`${occDate}T12:00:00`).toISOString();
+          occEnd = new Date(`${addDaysToDateStr(occDate, spanDays)}T12:00:00`).toISOString();
+        } else {
+          const base = new Date(`${occDate}T${startTimeOfDay || "09:00"}`);
+          occStart = base.toISOString();
+          occEnd = new Date(base.getTime() + duration * 60000).toISOString();
+        }
+        return {
+          ...data,
+          start_time:          occStart,
+          end_time:            occEnd,
+          recurrence:          recurrence === "none" ? null : recurrence,
+          recurrence_until:    recurrence === "none" ? null : recurrenceUntil,
+          recurrence_group_id: groupId,
+        };
+      });
+
+      const { data: createdRows, error: insertErr } = await supabase.from("calendar_events").insert(rows).select();
+      const created = createdRows?.[0];
       if (insertErr || !created?.id) { setError(insertErr?.message ?? "Failed to save."); setSaving(false); return; }
       triggerBackup({ calendar: true });
 
@@ -417,6 +521,53 @@ export function EventForm({
               </div>
             )}
           </div>
+
+          {/* Repeat */}
+          {!event ? (
+            <div className="space-y-1.5">
+              <Label>Repeats</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Select
+                  value={recurrence}
+                  onValueChange={(v) => {
+                    const rule = v as Recurrence;
+                    setRecurrence(rule);
+                    // Offer a sensible end date so choosing "repeats" isn't two decisions.
+                    if (rule !== "none" && !recurrenceUntil) setRecurrenceUntil(defaultUntilFor(rule, startDate));
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RECURRENCE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {recurrence !== "none" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="recurrence_until">Repeat until</Label>
+                    <Input
+                      id="recurrence_until"
+                      type="date"
+                      value={recurrenceUntil}
+                      min={startDate || undefined}
+                      onChange={(e) => setRecurrenceUntil(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+              {recurrence !== "none" && startDate && recurrenceUntil >= startDate && (
+                <p className="text-xs text-muted-foreground">
+                  Creates {occurrenceDates(startDate, recurrence, recurrenceUntil).length} events. You can delete the
+                  whole series later, or just one date.
+                </p>
+              )}
+            </div>
+          ) : event.recurrence_group_id ? (
+            <p className="text-xs text-muted-foreground">
+              This is one date in a repeating series — saving changes only this one.
+            </p>
+          ) : null}
 
           {/* Reminder */}
           {eventType === "appointment" && (

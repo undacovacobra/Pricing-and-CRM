@@ -49,7 +49,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
           </Link>
           <h1 className="text-2xl font-bold text-slate-900 mt-1">Edit Event</h1>
         </div>
-        <DeleteEventButton eventId={id} eventTitle={event.title} />
+        <DeleteEventButton eventId={id} eventTitle={event.title} recurrenceGroupId={event.recurrence_group_id} />
       </div>
 
       {hasQuickInfo && (
