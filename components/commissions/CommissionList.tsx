@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { formatCurrency, formatDate, todayInputValue } from "@/lib/utils";
+import { formatCurrency, formatDate, dateInputValue, todayInputValue } from "@/lib/utils";
 import { triggerBackup } from "@/lib/backup/trigger";
 import { Trash2, Download, Pencil } from "lucide-react";
 import type { DesignerCommission, Job } from "@/lib/types/database";
@@ -74,50 +74,9 @@ export function CommissionList({
           <CardHeader className="pb-3">
             <CardTitle className="text-base text-muted-foreground">Paid History</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {paid.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 p-3 border rounded-lg opacity-70">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{commissionTitle(c)}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
-                    Submitted {formatDate(c.submitted_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {c.invoice_storage_path && (
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={invoiceUrl(c.invoice_storage_path)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        View
-                      </a>
-                      <a
-                        href={invoiceUrl(c.invoice_storage_path)}
-                        download
-                        className="text-slate-400 hover:text-slate-700"
-                        title="Download invoice"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </div>
-                  )}
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-green-700">
-                      {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Paid {c.paid_at ? formatDate(c.paid_at) : ""}</p>
-                  </div>
-                  {!readOnly && (
-                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDelete(c)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <CommissionRow key={c.id} commission={c} canMarkPaid={canMarkPaid} jobs={jobs} readOnly={readOnly} onDelete={() => handleDelete(c)} />
             ))}
           </CardContent>
         </Card>
@@ -141,10 +100,12 @@ function CommissionRow({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const isPaid = c.status === "paid";
   const [paying, setPaying] = useState(false);
-  const [paidAmount, setPaidAmount] = useState(c.amount?.toString() ?? "");
-  const [paidDate, setPaidDate] = useState(todayInputValue());
-  const [method, setMethod] = useState("");
+  // Seeded from the record when already paid, so editing shows the real figures.
+  const [paidAmount, setPaidAmount] = useState(((isPaid ? c.paid_amount : null) ?? c.amount)?.toString() ?? "");
+  const [paidDate, setPaidDate] = useState(c.paid_at ? dateInputValue(c.paid_at) : todayInputValue());
+  const [method, setMethod] = useState(c.payment_method ?? "");
   const [loading, setLoading] = useState(false);
 
   // Editing (pending commissions only).
@@ -200,6 +161,14 @@ function CommissionRow({
         amount:               editAmount ? parseFloat(editAmount) : null,
         notes:                editNotes.trim() || null,
         invoice_storage_path: invoicePath,
+        // An already-paid commission also exposes its payment details for correction.
+        ...(isPaid
+          ? {
+              paid_amount:    paidAmount ? parseFloat(paidAmount) : null,
+              paid_at:        paidDate ? new Date(`${paidDate}T12:00:00`).toISOString() : c.paid_at,
+              payment_method: method.trim() || null,
+            }
+          : {}),
       }).eq("id", c.id);
       triggerBackup({ commissions: true, jobId: jobMode === "existing" ? jobId : undefined });
       setSavingEdit(false);
@@ -221,8 +190,13 @@ function CommissionRow({
             {c.job?.customer ? `${c.job.customer.first_name} ${c.job.customer.last_name} · ` : ""}
             Submitted {formatDate(c.submitted_at)}
           </p>
-          {c.amount && (
-            <p className="text-sm font-semibold mt-1">{formatCurrency(c.amount)}</p>
+          {isPaid ? (
+            <p className="text-sm font-semibold mt-1 text-green-700">
+              {formatCurrency(c.paid_amount ?? c.amount ?? 0)}
+              <span className="font-normal text-xs text-muted-foreground"> · Paid {c.paid_at ? formatDate(c.paid_at) : ""}</span>
+            </p>
+          ) : (
+            c.amount && <p className="text-sm font-semibold mt-1">{formatCurrency(c.amount)}</p>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -247,7 +221,7 @@ function CommissionRow({
               <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
           )}
-          {canMarkPaid && (
+          {canMarkPaid && !isPaid && (
             <Button size="sm" onClick={() => { setPaying(!paying); setEditing(false); }}>
               Mark Paid
             </Button>
@@ -302,6 +276,27 @@ function CommissionRow({
               <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="h-8 text-sm" />
             </div>
           </div>
+
+          {isPaid && (
+            <div className="space-y-2 rounded-md border bg-white p-2">
+              <p className="text-xs font-medium text-slate-700">Payment details</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Amount paid ($)</Label>
+                  <Input type="number" step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Date paid</Label>
+                  <Input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Method</Label>
+                  <Input placeholder="Zelle, check..." value={method} onChange={(e) => setMethod(e.target.value)} className="h-8 text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1">
             <Label className="text-xs">Replace file (optional)</Label>
             <input

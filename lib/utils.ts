@@ -49,17 +49,26 @@ export function formatDate(date: string | Date | null | undefined): string {
   }).format(d);
 }
 
-// Today's date as a YYYY-MM-DD value for <input type="date">, in Eastern time
-// (not UTC — which would jump to tomorrow after 8pm locally).
-export function todayInputValue(): string {
+// A date as the YYYY-MM-DD value an <input type="date"> expects, read in Eastern
+// time (not UTC — which would show the next day after 8pm locally).
+export function dateInputValue(date: string | Date | null | undefined): string {
+  if (!date) return "";
+  // Already a plain calendar date — use it as-is.
+  if (typeof date === "string" && DATE_ONLY.test(date)) return date;
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(d);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+export function todayInputValue(): string {
+  return dateInputValue(new Date());
 }
 
 // Date + time, safe against unparseable input (used for appointments).
