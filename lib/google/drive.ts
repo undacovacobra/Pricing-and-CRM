@@ -323,6 +323,19 @@ export async function searchDriveFoldersByName(accessToken: string, name: string
   return data.files ?? [];
 }
 
+// True if the folder actually exists and is reachable. Listing a folder's
+// children is NOT a existence check: Drive answers "no children" for an id that
+// doesn't exist, so a deleted folder looks like an empty one. Fetching the file
+// itself is the only way to tell them apart.
+export async function driveFileExists(accessToken: string, fileId: string): Promise<boolean> {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?fields=id,trashed&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return false;
+  const data = (await res.json()) as { id?: string; trashed?: boolean };
+  return Boolean(data.id) && data.trashed !== true;
+}
+
 // The id of a folder's parent, or null. Used to create a replacement folder in
 // the same place the other job folders live, rather than guessing a location.
 export async function getDriveParentId(accessToken: string, fileId: string): Promise<string | null> {

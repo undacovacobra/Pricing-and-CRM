@@ -10,6 +10,7 @@ import { adminConfigured } from "@/lib/supabase/admin";
 import { BackupCard } from "@/components/settings/BackupCard";
 import { UsersCard } from "@/components/settings/UsersCard";
 import { DriveMatchCard } from "@/components/settings/DriveMatchCard";
+import { DriveFolderAuditCard } from "@/components/settings/DriveFolderAuditCard";
 import { roleFromUser } from "@/lib/auth/roles";
 
 const BANNERS: Record<string, { text: string; tone: "ok" | "warn" }> = {
@@ -134,6 +135,8 @@ export default async function SettingsPage({
         driveReadAccess={status.readAccess}
         lastRun={lastRun ?? null}
       />
+
+      {isOwner && <DriveFolderAuditCard />}
 
       {isOwner && <DriveMatchCard />}
     </div>

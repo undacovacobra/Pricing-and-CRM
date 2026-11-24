@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { roleFromUser } from "@/lib/auth/roles";
 import { getOwnerAccessToken, importJobDriveFiles } from "@/lib/backup/engine";
-import { listDriveFolderChildren, createDriveFolder, getDriveParentId } from "@/lib/google/drive";
+import { listDriveFolderChildren, createDriveFolder, getDriveParentId, driveFileExists } from "@/lib/google/drive";
 
 export const maxDuration = 120;
 
@@ -55,6 +55,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const token = await getOwnerAccessToken(admin);
   if (!token) return NextResponse.json({ state: "no_connection" });
+
+  // Check the folder exists first — listing children of a deleted folder quietly
+  // returns nothing rather than failing.
+  if (!(await driveFileExists(token, folderId))) return NextResponse.json({ state: "missing" });
 
   try {
     const children = await listDriveFolderChildren(token, folderId);
