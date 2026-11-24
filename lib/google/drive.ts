@@ -111,7 +111,7 @@ export async function shareWithAnyone(
   fileId: string,
   role: "reader" | "writer" = "writer",
 ): Promise<void> {
-  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false`, {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
     method:  "POST",
     headers: {
       Authorization:  `Bearer ${accessToken}`,
@@ -123,7 +123,7 @@ export async function shareWithAnyone(
 }
 
 export async function createDriveFolder(accessToken: string, name: string, parentId?: string): Promise<DriveFolder> {
-  const res = await fetch(`${DRIVE_FILES_URL}?fields=id,webViewLink`, {
+  const res = await fetch(`${DRIVE_FILES_URL}?fields=id,webViewLink&supportsAllDrives=true`, {
     method:  "POST",
     headers: {
       Authorization:  `Bearer ${accessToken}`,
@@ -321,6 +321,17 @@ export async function searchDriveFoldersByName(accessToken: string, name: string
   if (!res.ok) throw new Error(`Drive folder search failed: ${await res.text()}`);
   const data = (await res.json()) as { files?: DriveChild[] };
   return data.files ?? [];
+}
+
+// The id of a folder's parent, or null. Used to create a replacement folder in
+// the same place the other job folders live, rather than guessing a location.
+export async function getDriveParentId(accessToken: string, fileId: string): Promise<string | null> {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}?fields=parents&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { parents?: string[] };
+  return data.parents?.[0] ?? null;
 }
 
 // Deletes a Drive file/folder the app created. Ignores 404 (already gone).

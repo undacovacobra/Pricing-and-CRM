@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminConfigured, createAdminClient } from "@/lib/supabase/admin";
 import { roleFromUser } from "@/lib/auth/roles";
 import { getOwnerAccessToken, importJobDriveFiles } from "@/lib/backup/engine";
-import { listDriveFolderChildren } from "@/lib/google/drive";
+import { listDriveFolderChildren, createDriveFolder, getDriveParentId } from "@/lib/google/drive";
 
 export const maxDuration = 120;
 
@@ -27,6 +27,47 @@ async function gate(id: string) {
   return { supabase, jobId: id };
 }
 
+// Resolves the folder this job reads from: an explicit override, else the folder
+// attached to the job.
+function folderIdFor(job: { drive_import_folder_id?: string | null; google_drive_folder_url?: string | null } | null) {
+  if (job?.drive_import_folder_id) return job.drive_import_folder_id;
+  const m = job?.google_drive_folder_url?.match(/folders\/([-\w]+)/);
+  return m ? m[1] : null;
+}
+
+// GET — is this job's Drive folder actually reachable, and what's in it?
+// Without this a deleted folder is indistinguishable from an empty one: the sync
+// swallows the error and the page just says "no attachments yet".
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const g = await gate(id);
+  if (g.error) return g.error;
+
+  const admin = createAdminClient();
+  const { data: job } = await admin
+    .from("jobs")
+    .select("drive_import_folder_id, google_drive_folder_url")
+    .eq("id", id)
+    .maybeSingle();
+
+  const folderId = folderIdFor(job);
+  if (!folderId) return NextResponse.json({ state: "none" });
+
+  const token = await getOwnerAccessToken(admin);
+  if (!token) return NextResponse.json({ state: "no_connection" });
+
+  try {
+    const children = await listDriveFolderChildren(token, folderId);
+    const files = children.filter((c) => c.mimeType !== "application/vnd.google-apps.folder");
+    const folders = children.length - files.length;
+    return NextResponse.json({ state: "ok", fileCount: files.length, folderCount: folders });
+  } catch {
+    // The folder id is stored but Drive won't return it — deleted, trashed, or
+    // not shared with the connected account.
+    return NextResponse.json({ state: "missing" });
+  }
+}
+
 // POST — link an existing Drive folder to this job and import its files now.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,7 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Body is optional: no url = just "Sync now" using the folder already attached
   // to the job; a url = set an explicit override folder, then sync.
-  let body: { url?: string } = {};
+  let body: { url?: string; action?: string } = {};
   try {
     body = await request.json();
   } catch {
@@ -46,6 +87,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const token = await getOwnerAccessToken(admin);
   if (!token) {
     return NextResponse.json({ error: "no_connection", detail: "Google Drive isn't connected (Settings → Connect Google Drive)." }, { status: 400 });
+  }
+
+  // Make a fresh folder for this job — for jobs that never got one, or whose
+  // folder was deleted in Drive, leaving a dead link.
+  if (body.action === "create") {
+    const { data: job } = await admin.from("jobs").select("title").eq("id", id).maybeSingle();
+    if (!job) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+    // Put it wherever the other job folders already live, so everything stays
+    // together instead of landing somewhere arbitrary.
+    const { data: sibling } = await admin
+      .from("jobs")
+      .select("google_drive_folder_url")
+      .not("google_drive_folder_url", "is", null)
+      .neq("id", id)
+      .limit(1)
+      .maybeSingle();
+    const siblingId = folderIdFor(sibling as { google_drive_folder_url?: string | null } | null);
+    const parentId = siblingId ? await getDriveParentId(token, siblingId) : null;
+
+    try {
+      const folder = await createDriveFolder(token, (job.title as string) || "Job", parentId ?? undefined);
+      const url = folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`;
+      const { error: saveErr } = await admin
+        .from("jobs")
+        .update({ google_drive_folder_url: url, drive_import_folder_id: null, drive_import_folder_url: null })
+        .eq("id", id);
+      if (saveErr) return NextResponse.json({ error: "save_failed", detail: saveErr.message }, { status: 502 });
+      return NextResponse.json({ ok: true, created: true, url, imported: 0 });
+    } catch (e) {
+      return NextResponse.json(
+        { error: "create_failed", detail: e instanceof Error ? e.message : String(e) },
+        { status: 502 },
+      );
+    }
   }
 
   const rawUrl = (body.url ?? "").trim();

@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FolderSync, ExternalLink, RefreshCw } from "lucide-react";
+import { FolderSync, ExternalLink, RefreshCw, AlertTriangle, FolderPlus, CheckCircle2 } from "lucide-react";
 
 // Shows that a job auto-imports from its Google Drive folder and lets you pull
 // files in on demand. No setup needed — it uses the folder already attached to
@@ -18,7 +18,23 @@ export function JobDriveFolderLink({
   hasOverride: boolean;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<null | "sync" | "save" | "reset">(null);
+  const [busy, setBusy] = useState<null | "sync" | "save" | "reset" | "create">(null);
+  // What Drive actually says about the folder, so a deleted folder doesn't look
+  // the same as an empty one.
+  const [health, setHealth] = useState<
+    { state: "loading" } | { state: "none" } | { state: "missing" } | { state: "no_connection" } | { state: "ok"; fileCount: number }
+  >({ state: "loading" });
+
+  async function checkHealth() {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/drive-folder`);
+      const data = await res.json();
+      setHealth(res.ok ? data : { state: "missing" });
+    } catch {
+      setHealth({ state: "missing" });
+    }
+  }
+  useEffect(() => { checkHealth(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [jobId]);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
   const [showChange, setShowChange] = useState(false);
   const [newUrl, setNewUrl] = useState("");
@@ -42,9 +58,34 @@ export function JobDriveFolderLink({
         });
         setShowChange(false);
         setNewUrl("");
+        checkHealth();
         router.refresh();
       } else {
         setMessage({ text: data.detail || data.error || "Couldn't sync.", tone: "warn" });
+      }
+    } catch (e) {
+      setMessage({ text: String(e), tone: "warn" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createFolder() {
+    setBusy("create");
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/drive-folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage({ text: "Created a Drive folder for this job. Save files into it and they'll appear here.", tone: "ok" });
+        checkHealth();
+        router.refresh();
+      } else {
+        setMessage({ text: data.detail || data.error || "Couldn't create the folder.", tone: "warn" });
       }
     } catch (e) {
       setMessage({ text: String(e), tone: "warn" });
@@ -82,11 +123,48 @@ export function JobDriveFolderLink({
         each night. Use <strong>Sync now</strong> to pull it in immediately.
       </p>
 
+      {/* Say plainly what Drive reports, rather than showing an empty list either way. */}
+      {health.state === "missing" && (
+        <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2 text-xs text-orange-800">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            This job&apos;s Google Drive folder no longer exists — it was deleted or renamed in Drive, so the link
+            above opens a 404 and nothing can sync. Create a new folder to fix it, or point the job at an existing one.
+          </span>
+        </div>
+      )}
+      {health.state === "none" && (
+        <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
+          <span>This job has no Google Drive folder yet.</span>
+        </div>
+      )}
+      {health.state === "no_connection" && (
+        <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-2.5 py-2 text-xs text-orange-800">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>Google Drive isn&apos;t connected, so folders can&apos;t be read (Settings → Connect Google Drive).</span>
+        </div>
+      )}
+      {health.state === "ok" && (
+        <p className="flex items-center gap-1.5 text-xs text-slate-600">
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+          {health.fileCount === 0
+            ? "Folder is connected and currently empty."
+            : `Folder is connected — ${health.fileCount} file${health.fileCount === 1 ? "" : "s"} in Drive.`}
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" className="h-8" disabled={busy !== null} onClick={() => post(undefined, "sync")}>
-          <RefreshCw className="h-3.5 w-3.5" /> {busy === "sync" ? "Syncing…" : "Sync now"}
-        </Button>
-        {folderUrl && (
+        {(health.state === "missing" || health.state === "none") ? (
+          <Button size="sm" className="h-8" disabled={busy !== null} onClick={createFolder}>
+            <FolderPlus className="h-3.5 w-3.5" /> {busy === "create" ? "Creating…" : "Create a folder"}
+          </Button>
+        ) : (
+          <Button size="sm" className="h-8" disabled={busy !== null} onClick={() => post(undefined, "sync")}>
+            <RefreshCw className="h-3.5 w-3.5" /> {busy === "sync" ? "Syncing…" : "Sync now"}
+          </Button>
+        )}
+        {folderUrl && health.state !== "missing" && (
           <a href={folderUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
             <ExternalLink className="h-3 w-3" /> Open the folder
           </a>
